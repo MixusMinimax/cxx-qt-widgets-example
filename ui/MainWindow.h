@@ -13,12 +13,12 @@ class MainWindow : public QMainWindow {
     Q_OBJECT
 
 public:
-    explicit MainWindow(rust::Box<AsyncControllerHandle> tokio_handle, QWidget *parent = nullptr);
+    explicit MainWindow(rust::Box<backend::AsyncControllerHandle> tokio_handle, QWidget *parent = nullptr);
 
     ~MainWindow() override;
 
 private:
-    Backend *backend;
+    backend::Backend *backend;
 };
 
 

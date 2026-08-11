@@ -7,8 +7,8 @@
 #include <QWindow>
 #include <QWidget>
 
-MainWindow::MainWindow(rust::Box<AsyncControllerHandle> tokio_handle, QWidget *parent) : QMainWindow(parent),
-    backend{new Backend(this)} {
+MainWindow::MainWindow(rust::Box<backend::AsyncControllerHandle> tokio_handle, QWidget *parent) : QMainWindow(parent),
+    backend{new backend::Backend(this)} {
     backend->initialize(std::move(tokio_handle));
     setWindowTitle(tr("Example App"));
 
@@ -24,7 +24,7 @@ MainWindow::MainWindow(rust::Box<AsyncControllerHandle> tokio_handle, QWidget *p
     connect(actionOpen, &QAction::triggered, [this] { statusBar()->showMessage(tr("actionOpen")); });
     connect(button, &QPushButton::pressed, [this] { statusBar()->showMessage(backend->make_message(tr("button"))); });
 
-    connect(backend, &Backend::message_received, [this](const QString &msg) {
+    connect(backend, &backend::Backend::message_received, [this](const QString &msg) {
         statusBar()->showMessage(msg);
     });
 }

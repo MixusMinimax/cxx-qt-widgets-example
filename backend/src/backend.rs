@@ -13,12 +13,14 @@ mod ffi {
         type QString = cxx_qt_lib::QString;
     }
 
+    #[namespace = "backend"]
     unsafe extern "C++" {
         include!("backend/src/controller.cxx.h");
 
         type AsyncControllerHandle = crate::controller::AsyncControllerHandle;
     }
 
+    #[namespace = "backend"]
     extern "RustQt" {
         #[qobject]
         type Backend = super::BackendRust;

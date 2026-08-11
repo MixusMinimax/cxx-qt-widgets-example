@@ -7,11 +7,11 @@ use tokio_util::sync::{CancellationToken, WaitForCancellationFuture};
 use tokio_util::task::TaskTracker;
 
 unsafe impl ExternType for AsyncControllerHandle {
-    type Id = cxx::type_id!("AsyncControllerHandle");
+    type Id = cxx::type_id!("backend::AsyncControllerHandle");
     type Kind = cxx::kind::Opaque;
 }
 
-#[cxx::bridge]
+#[cxx::bridge(namespace = "backend")]
 mod ffi {
     extern "Rust" {
         type AsyncController;

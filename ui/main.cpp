@@ -4,7 +4,7 @@
 #include <backend/src/controller.cxx.h>
 
 int main(int argc, char *argv[]) {
-    auto controller = create_async_controller();
+    auto controller = backend::create_async_controller();
 
     const QApplication app(argc, argv);
 
