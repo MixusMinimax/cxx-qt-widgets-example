@@ -97,7 +97,7 @@ impl Future for CancellableJoinHandle {
     type Output = <JoinHandle<()> as Future>::Output;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        Pin::new(&mut self.get_mut().handle).poll(cx)
+        unsafe { self.map_unchecked_mut(|this| &mut this.handle) }.poll(cx)
     }
 }
 
