@@ -9,6 +9,15 @@
 #include <backend/src/backend.cxxqt.h>
 #include <backend/src/controller.cxx.h>
 
+#include <memory>
+
+QT_BEGIN_NAMESPACE
+namespace Ui {
+    class MainWindow;
+}
+
+QT_END_NAMESPACE
+
 class MainWindow : public QMainWindow {
     Q_OBJECT
 
@@ -19,6 +28,7 @@ public:
 
 private:
     backend::Backend *backend;
+    std::unique_ptr<Ui::MainWindow> ui;
 };
 
 

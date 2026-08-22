@@ -4,7 +4,6 @@ project(MyApp LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_AUTOMOC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS
         Core
@@ -27,17 +26,19 @@ if (NOT CxxQt_FOUND)
     FetchContent_MakeAvailable(CxxQt)
 endif ()
 
+qt_standard_project_setup()
+
 cxx_qt_import_crate(
         MANIFEST_PATH ${CMAKE_CURRENT_SOURCE_DIR}/backend/Cargo.toml
         CRATES backend
         QT_MODULES Qt6::Core
 )
 
-add_executable(myapp
+qt_add_executable(myapp
         ui/main.cpp
         ui/MainWindow.cpp
-        ui/MainWindow.cpp
         ui/MainWindow.h
+        ui/MainWindow.ui
 )
 
 target_link_libraries(myapp
