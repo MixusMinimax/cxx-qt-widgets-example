@@ -42,11 +42,11 @@
     <property name="title">
      <string>&amp;File</string>
     </property>
-    <addaction name="action_New"/>
-    <addaction name="action_Open"/>
+    <addaction name="actionNew"/>
+    <addaction name="actionOpen"/>
     <addaction name="actionSave"/>
-    <addaction name="action_asd"/>
-    <addaction name="action_Close"/>
+    <addaction name="actionSaveAs"/>
+    <addaction name="actionQuit"/>
    </widget>
    <widget class="QMenu" name="menu_Edit">
     <property name="title">
@@ -69,12 +69,12 @@
    <addaction name="menu_View"/>
    <addaction name="menu_Help"/>
   </widget>
-  <action name="action_New">
+  <action name="actionNew">
    <property name="text">
     <string>&amp;New</string>
    </property>
   </action>
-  <action name="action_Open">
+  <action name="actionOpen">
    <property name="text">
     <string>&amp;Open</string>
    </property>
@@ -84,9 +84,9 @@
     <string>&amp;Save</string>
    </property>
   </action>
-  <action name="action_asd">
+  <action name="actionSaveAs">
    <property name="text">
-    <string>&amp;Save as...</string>
+    <string>Save &amp;as...</string>
    </property>
   </action>
   <action name="action_Close">
@@ -102,6 +102,11 @@
   <action name="action_About">
    <property name="text">
     <string>&amp;About</string>
+   </property>
+  </action>
+  <action name="actionQuit">
+   <property name="text">
+    <string>&amp;Quit</string>
    </property>
   </action>
  </widget>

@@ -26,6 +26,19 @@ public:
 
     ~MainWindow() override;
 
+private slots:
+    void newProject() const;
+
+    void open() const;
+
+    void save();
+
+    void save_as();
+
+    void quit();
+
+    void about();
+
 private:
     backend::Backend *backend;
     std::unique_ptr<Ui::MainWindow> ui;
