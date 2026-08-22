@@ -2,8 +2,14 @@ cmake_minimum_required(VERSION 3.14)
 
 project(MyApp LANGUAGES CXX)
 
+option(AUTOLINK_COMPILE_COMMANDS "\
+symlink the compile_commands.json file from the build folder into the root folder. \
+clangd only checks in the root folder and the /build folder, \
+but in CLion, the build folder is called /cmake-build-debug." OFF)
+
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(Qt6 REQUIRED COMPONENTS
         Core
@@ -48,3 +54,11 @@ target_link_libraries(myapp
         Qt6::Widgets
         backend
 )
+
+if (AUTOLINK_COMPILE_COMMANDS)
+    execute_process(
+            COMMAND ${CMAKE_COMMAND} -E create_symlink
+            ${CMAKE_BINARY_DIR}/compile_commands.json
+            ${CMAKE_SOURCE_DIR}/compile_commands.json
+    )
+endif ()

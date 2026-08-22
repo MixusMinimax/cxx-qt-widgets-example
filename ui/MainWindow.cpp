@@ -2,11 +2,10 @@
 #include "ui_MainWindow.h"
 
 #include <QStatusBar>
-#include <QMenuBar>
 #include <QPushButton>
 #include <QWindowStateChangeEvent>
-#include <QWindow>
 #include <QWidget>
+#include <QDebug>
 
 MainWindow::MainWindow(rust::Box<backend::AsyncControllerHandle> tokio_handle, QWidget *parent) : QMainWindow(parent),
     backend{new backend::Backend(this)},
@@ -27,6 +26,7 @@ MainWindow::MainWindow(rust::Box<backend::AsyncControllerHandle> tokio_handle, Q
     connect(ui->actionSave, &QAction::triggered, this, &MainWindow::save);
     connect(ui->actionSaveAs, &QAction::triggered, this, &MainWindow::save_as);
     connect(ui->actionQuit, &QAction::triggered, this, &MainWindow::quit);
+    connect(ui->actionAbout, &QAction::triggered, this, &MainWindow::about);
 
     connect(ui->pushButton, &QPushButton::pressed, [this] {
         statusBar()->showMessage(backend->make_message(tr("button")));
@@ -40,22 +40,32 @@ MainWindow::MainWindow(rust::Box<backend::AsyncControllerHandle> tokio_handle, Q
 MainWindow::~MainWindow() = default;
 
 void MainWindow::newProject() const {
-    statusBar()->showMessage(tr("actionNew"));
+    qDebug() << "MainWindow::newProject()";
+    statusBar()->showMessage(tr("newProject"));
 }
 
 void MainWindow::open() const {
-    statusBar()->showMessage(tr("actionOpen"));
+    qDebug() << "MainWindow::open()";
+    statusBar()->showMessage(tr("open"));
 }
 
-void MainWindow::save() {
+void MainWindow::save() const {
+    qDebug() << "MainWindow::save()";
+    statusBar()->showMessage(tr("save"));
 }
 
-void MainWindow::save_as() {
+void MainWindow::save_as() const {
+    qDebug() << "MainWindow::save_as()";
+    statusBar()->showMessage(tr("save_as"));
 }
 
 void MainWindow::quit() {
+    qDebug() << "MainWindow::quit()";
+    statusBar()->showMessage(tr("quit"));
     close();
 }
 
-void MainWindow::about() {
+void MainWindow::about() const {
+    qDebug() << "MainWindow::about()";
+    statusBar()->showMessage(tr("about"));
 }

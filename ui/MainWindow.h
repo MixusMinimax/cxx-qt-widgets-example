@@ -31,13 +31,13 @@ private slots:
 
     void open() const;
 
-    void save();
+    void save() const;
 
-    void save_as();
+    void save_as() const;
 
     void quit();
 
-    void about();
+    void about() const;
 
 private:
     backend::Backend *backend;
