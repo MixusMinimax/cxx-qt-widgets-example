@@ -1,7 +1,3 @@
-//
-// Created by maxi on 8/11/26.
-//
-
 #ifndef MYAPP_MAINWINDOW_H
 #define MYAPP_MAINWINDOW_H
 
@@ -10,6 +6,8 @@
 #include <backend/src/controller.cxx.h>
 
 #include <memory>
+
+class MyModel;
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -26,6 +24,8 @@ public:
 
     ~MainWindow() override;
 
+    void setModel(MyModel *model);
+
 private slots:
     void newProject() const;
 
@@ -40,8 +40,9 @@ private slots:
     void about() const;
 
 private:
-    backend::Backend *backend;
-    std::unique_ptr<Ui::MainWindow> ui;
+    backend::Backend *m_backend;
+    MyModel *m_model;
+    std::unique_ptr<Ui::MainWindow> m_ui;
 };
 
 

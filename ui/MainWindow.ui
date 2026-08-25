@@ -27,7 +27,7 @@
      <string>Press me!</string>
     </property>
    </widget>
-   <widget class="QCustomPlot" name="graphOutput" native="true">
+   <widget class="BloodPressureGraph" name="graphOutput" native="true">
     <property name="geometry">
      <rect>
       <x>209</x>
@@ -112,9 +112,9 @@
  </widget>
  <customwidgets>
   <customwidget>
-   <class>QCustomPlot</class>
+   <class>BloodPressureGraph</class>
    <extends>QWidget</extends>
-   <header>qcustomplot.h</header>
+   <header>BloodPressureGraph.h</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

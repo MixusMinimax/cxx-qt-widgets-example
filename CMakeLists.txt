@@ -47,7 +47,13 @@ qt_add_executable(myapp
         ui/MainWindow.cpp
         ui/MainWindow.h
         ui/MainWindow.ui
+        ui/BloodPressureGraph.cpp
+        ui/BloodPressureGraph.h
+        ui/MyModel.cpp
+        ui/MyModel.h
 )
+
+target_include_directories(myapp PUBLIC ui)
 
 target_link_libraries(myapp
         PRIVATE
