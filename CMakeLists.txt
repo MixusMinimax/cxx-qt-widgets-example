@@ -34,6 +34,8 @@ endif ()
 
 qt_standard_project_setup()
 
+add_subdirectory(vendor)
+
 cxx_qt_import_crate(
         MANIFEST_PATH ${CMAKE_CURRENT_SOURCE_DIR}/backend/Cargo.toml
         CRATES backend
@@ -45,6 +47,8 @@ qt_add_executable(myapp
         ui/MainWindow.cpp
         ui/MainWindow.h
         ui/MainWindow.ui
+        ui/GraphWidget.cpp
+        ui/GraphWidget.h
 )
 
 target_link_libraries(myapp
@@ -53,6 +57,7 @@ target_link_libraries(myapp
         Qt6::Gui
         Qt6::Widgets
         backend
+        qcustomplot
 )
 
 if (AUTOLINK_COMPILE_COMMANDS)
