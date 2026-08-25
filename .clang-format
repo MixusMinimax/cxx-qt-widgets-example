@@ -4,7 +4,7 @@ BasedOnStyle: LLVM
 AccessModifierOffset: -4
 AlignConsecutiveAssignments: false
 AlignConsecutiveDeclarations: false
-AlignOperands: true
+AlignOperands: DontAlign
 AlignTrailingComments: false
 AlwaysBreakTemplateDeclarations: Yes
 AllowShortIfStatementsOnASingleLine: WithoutElse
