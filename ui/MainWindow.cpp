@@ -44,11 +44,14 @@ MainWindow::~MainWindow() = default;
 void MainWindow::setModel(MyModel *model) {
     if (m_model == model) return;
     if (m_model) {
-        disconnect(m_ui->pushButton, &QPushButton::pressed, m_model, &MyModel::incrementSpeed);
+        for (auto &&conn: m_modelConnections)
+            disconnect(conn);
     }
     m_model = model;
     if (m_model) {
-        connect(m_ui->pushButton, &QPushButton::pressed, m_model, &MyModel::incrementSpeed);
+        m_modelConnections = {
+            connect(m_ui->pushButton, &QPushButton::pressed, m_model, &MyModel::incrementSpeed),
+        };
     }
     m_ui->graphOutput->setModel(model);
 }

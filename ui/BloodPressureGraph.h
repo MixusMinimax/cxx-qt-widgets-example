@@ -4,6 +4,8 @@
 #include <QCustomPlot>
 #include <QWidget>
 
+#include <array>
+
 class MyModel;
 
 class BloodPressureGraph : public QCustomPlot {
@@ -23,7 +25,7 @@ private slots:
 
 private:
     MyModel *m_model;
-    QMetaObject::Connection m_modelConnection;
+    std::array<QMetaObject::Connection, 1> m_modelConnections;
 };
 
 

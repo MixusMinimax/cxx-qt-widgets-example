@@ -25,14 +25,17 @@ BloodPressureGraph::~BloodPressureGraph() = default;
 void BloodPressureGraph::setModel(MyModel *model) {
     if (model == m_model) return;
     if (m_model) {
-        disconnect(m_modelConnection);
+        for (auto &&conn: m_modelConnections)
+            disconnect(conn);
     }
     m_model = model;
     if (m_model) {
-        m_modelConnection = connect(m_model, &MyModel::speedChanged, this, &BloodPressureGraph::onSpeedChanged);
+        m_modelConnections = {
+            connect(m_model, &MyModel::speedChanged, this, &BloodPressureGraph::onSpeedChanged),
+        };
         onSpeedChanged(m_model->speed());
     } else {
-        m_modelConnection = {};
+        m_modelConnections = {};
     }
 }
 

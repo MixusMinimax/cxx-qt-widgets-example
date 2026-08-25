@@ -6,6 +6,7 @@
 #include <backend/src/controller.cxx.h>
 
 #include <memory>
+#include <array>
 
 class MyModel;
 
@@ -40,8 +41,9 @@ private slots:
     void about() const;
 
 private:
-    backend::Backend *m_backend;
-    MyModel *m_model;
+    backend::Backend *m_backend = nullptr;
+    MyModel *m_model = nullptr;
+    std::array<QMetaObject::Connection, 1> m_modelConnections;
     std::unique_ptr<Ui::MainWindow> m_ui;
 };
 
