@@ -29,4 +29,4 @@ private:
 };
 
 
-#endif //MYAPP_BLOODPRESSUREGRAPH_H
+#endif // MYAPP_BLOODPRESSUREGRAPH_H

@@ -39,9 +39,7 @@ void BloodPressureGraph::setModel(MyModel *model) {
     }
 }
 
-MyModel *BloodPressureGraph::model() const {
-    return m_model;
-}
+MyModel *BloodPressureGraph::model() const { return m_model; }
 
 void BloodPressureGraph::onSpeedChanged(const int speed) {
     qDebug() << "Speed: " << speed;

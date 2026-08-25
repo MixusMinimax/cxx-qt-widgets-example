@@ -19,6 +19,11 @@ int main(int argc, char *argv[]) {
 
     QApplication::connect(&app, &QCoreApplication::aboutToQuit, [&controller] {
         controller->begin_shutdown();
+#ifdef _WIN32
+        // On windows, QApplication::exec() is not guaranteed to return. It may exit instead.
+        // We therefore need to fully wait for tokio to shut down.
+        controller->shutdown();
+#endif
     });
 
     const int ret = QApplication::exec();

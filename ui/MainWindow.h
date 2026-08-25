@@ -5,8 +5,8 @@
 #include <backend/src/backend.cxxqt.h>
 #include <backend/src/controller.cxx.h>
 
-#include <memory>
 #include <array>
+#include <memory>
 
 class MyModel;
 
@@ -48,4 +48,4 @@ private:
 };
 
 
-#endif //MYAPP_MAINWINDOW_H
+#endif // MYAPP_MAINWINDOW_H

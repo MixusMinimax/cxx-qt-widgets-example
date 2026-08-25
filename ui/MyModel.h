@@ -26,4 +26,4 @@ private:
 };
 
 
-#endif //MYAPP_MYMODEL_H
+#endif // MYAPP_MYMODEL_H

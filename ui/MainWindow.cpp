@@ -1,17 +1,16 @@
 #include "MainWindow.h"
-#include "ui_MainWindow.h"
 #include "BloodPressureGraph.h"
+#include "ui_MainWindow.h"
 
-#include <QStatusBar>
-#include <QPushButton>
-#include <QWidget>
 #include <QDebug>
+#include <QPushButton>
+#include <QStatusBar>
+#include <QWidget>
 
 #include "MyModel.h"
 
-MainWindow::MainWindow(rust::Box<backend::AsyncControllerHandle> tokio_handle, QWidget *parent) : QMainWindow(parent),
-    m_backend{new backend::Backend(this)},
-    m_ui{std::make_unique<Ui::MainWindow>()} {
+MainWindow::MainWindow(rust::Box<backend::AsyncControllerHandle> tokio_handle, QWidget *parent) :
+    QMainWindow(parent), m_backend{new backend::Backend(this)}, m_ui{std::make_unique<Ui::MainWindow>()} {
     m_backend->initialize(std::move(tokio_handle));
     m_ui->setupUi(this);
 
@@ -30,13 +29,11 @@ MainWindow::MainWindow(rust::Box<backend::AsyncControllerHandle> tokio_handle, Q
     connect(m_ui->actionQuit, &QAction::triggered, this, &MainWindow::quit);
     connect(m_ui->actionAbout, &QAction::triggered, this, &MainWindow::about);
 
-    connect(m_ui->pushButton, &QPushButton::pressed, [this] {
-        statusBar()->showMessage(m_backend->make_message(tr("button")));
-    });
+    connect(m_ui->pushButton, &QPushButton::pressed,
+            [this] { statusBar()->showMessage(m_backend->make_message(tr("button"))); });
 
-    connect(m_backend, &backend::Backend::message_received, [this](const QString &msg) {
-        statusBar()->showMessage(msg);
-    });
+    connect(m_backend, &backend::Backend::message_received,
+            [this](const QString &msg) { statusBar()->showMessage(msg); });
 }
 
 MainWindow::~MainWindow() = default;
