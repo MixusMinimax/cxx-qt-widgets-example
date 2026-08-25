@@ -7,6 +7,8 @@
 #include <QWidget>
 #include <QDebug>
 
+#include "GraphWidget.h"
+
 MainWindow::MainWindow(rust::Box<backend::AsyncControllerHandle> tokio_handle, QWidget *parent) : QMainWindow(parent),
     backend{new backend::Backend(this)},
     ui{std::make_unique<Ui::MainWindow>()} {
@@ -35,6 +37,24 @@ MainWindow::MainWindow(rust::Box<backend::AsyncControllerHandle> tokio_handle, Q
     connect(backend, &backend::Backend::message_received, [this](const QString &msg) {
         statusBar()->showMessage(msg);
     });
+
+
+    // generate some data:
+    QVector<double> x(101), y(101); // initialize with entries 0..100
+    for (int i = 0; i < 101; ++i) {
+        x[i] = i / 50.0 - 1; // x goes from -1 to 1
+        y[i] = x[i] * x[i]; // let's plot a quadratic function
+    }
+    // create graph and assign data to it:
+    ui->graphOutput->addGraph();
+    ui->graphOutput->graph(0)->setData(x, y);
+    // give the axes some labels:
+    ui->graphOutput->xAxis->setLabel("x");
+    ui->graphOutput->yAxis->setLabel("y");
+    // set axes ranges, so we see all data:
+    ui->graphOutput->xAxis->setRange(-1, 1);
+    ui->graphOutput->yAxis->setRange(0, 1);
+    ui->graphOutput->replot();
 }
 
 MainWindow::~MainWindow() = default;

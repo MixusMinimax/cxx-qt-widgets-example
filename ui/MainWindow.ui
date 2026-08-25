@@ -17,14 +17,24 @@
    <widget class="QPushButton" name="pushButton">
     <property name="geometry">
      <rect>
-      <x>210</x>
-      <y>150</y>
+      <x>80</x>
+      <y>60</y>
       <width>88</width>
       <height>34</height>
      </rect>
     </property>
     <property name="text">
      <string>Press me!</string>
+    </property>
+   </widget>
+   <widget class="QCustomPlot" name="graphOutput" native="true">
+    <property name="geometry">
+     <rect>
+      <x>209</x>
+      <y>139</y>
+      <width>451</width>
+      <height>301</height>
+     </rect>
     </property>
    </widget>
   </widget>
@@ -100,6 +110,14 @@
    </property>
   </action>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>QCustomPlot</class>
+   <extends>QWidget</extends>
+   <header>qcustomplot.h</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>
