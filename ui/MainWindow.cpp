@@ -3,11 +3,8 @@
 
 #include <QStatusBar>
 #include <QPushButton>
-#include <QWindowStateChangeEvent>
 #include <QWidget>
 #include <QDebug>
-
-#include "GraphWidget.h"
 
 MainWindow::MainWindow(rust::Box<backend::AsyncControllerHandle> tokio_handle, QWidget *parent) : QMainWindow(parent),
     backend{new backend::Backend(this)},

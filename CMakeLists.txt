@@ -47,8 +47,6 @@ qt_add_executable(myapp
         ui/MainWindow.cpp
         ui/MainWindow.h
         ui/MainWindow.ui
-        ui/GraphWidget.cpp
-        ui/GraphWidget.h
 )
 
 target_link_libraries(myapp
