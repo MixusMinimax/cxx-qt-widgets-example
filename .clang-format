@@ -2,6 +2,8 @@
 Language: Cpp
 BasedOnStyle: LLVM
 AccessModifierOffset: -4
+AlignAfterOpenBracket: DontAlign
+AlignArrayOfStructures: None
 AlignConsecutiveAssignments: false
 AlignConsecutiveDeclarations: false
 AlignOperands: DontAlign
@@ -25,15 +27,17 @@ BraceWrapping:
   SplitEmptyFunction: true
   SplitEmptyRecord: true
   SplitEmptyNamespace: true
+BreakAfterOpenBracketBracedList: true
+BreakBeforeCloseBracketBracedList: true
 BreakBinaryOperations: RespectPrecedence
-BreakBeforeBraces: Custom
+BreakBeforeBraces: Mozilla
 BreakBeforeBinaryOperators: All
 BreakBeforeTernaryOperators: true
 BreakConstructorInitializers: AfterColon
-BreakConstructorInitializersBeforeComma: false
 ColumnLimit: 120
 ConstructorInitializerAllOnOneLineOrOnePerLine: false
 ContinuationIndentWidth: 4
+Cpp11BracedListStyle: true
 IncludeCategories:
   - Regex: '^<.*'
     Priority: 1
