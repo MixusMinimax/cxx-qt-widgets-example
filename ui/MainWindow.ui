@@ -14,29 +14,18 @@
    <string>MainWindow</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <widget class="QPushButton" name="pushButton">
-    <property name="geometry">
-     <rect>
-      <x>80</x>
-      <y>60</y>
-      <width>88</width>
-      <height>34</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Press me!</string>
-    </property>
-   </widget>
-   <widget class="BloodPressureGraph" name="graphOutput" native="true">
-    <property name="geometry">
-     <rect>
-      <x>209</x>
-      <y>139</y>
-      <width>451</width>
-      <height>301</height>
-     </rect>
-    </property>
-   </widget>
+   <layout class="QGridLayout" name="gridLayout">
+    <item row="0" column="0">
+     <widget class="QPushButton" name="pushButton">
+      <property name="text">
+       <string>Press me!</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="0">
+     <widget class="BloodPressureGraph" name="graphOutput" native="true"/>
+    </item>
+   </layout>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <widget class="QMenuBar" name="menubar">
