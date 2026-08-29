@@ -34,7 +34,7 @@ endif ()
 
 qt_standard_project_setup()
 
-add_subdirectory(vendor)
+add_subdirectory(vendor/qcustomplot)
 
 cxx_qt_import_crate(
         MANIFEST_PATH ${CMAKE_CURRENT_SOURCE_DIR}/backend/Cargo.toml
