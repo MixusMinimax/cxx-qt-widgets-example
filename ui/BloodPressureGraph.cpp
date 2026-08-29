@@ -20,6 +20,9 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent) : QCustomPlot(parent), m
         },
         measurement{
             .date_time = QDateTime(QDate(2026, 8, 28), QTime(16, 54)), .systolic = 125, .diastolic = 81, .pulse = 74
+        },
+        measurement{
+            .date_time = QDateTime(QDate(2026, 8, 29), QTime(11, 42)), .systolic = 144, .diastolic = 81, .pulse = 59
         }
     };
     for (auto &m: measurements) {
@@ -87,6 +90,14 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent) : QCustomPlot(parent), m
     xAxis->setRange(QCPAxisTickerDateTime::dateTimeToKey(first_day), QCPAxisTickerDateTime::dateTimeToKey(last_day));
     yAxis->setRange(0, 200);
     yAxis2->setRange(20, 300);
+
+    axisRect()->setRangeDrag(Qt::Horizontal);
+    axisRect()->setRangeZoom(Qt::Horizontal);
+    setInteractions(interactions() | QCP::iRangeDrag | QCP::iRangeZoom | QCP::iSelectPlottables);
+    g_systolic->setSelectable(QCP::stSingleData);
+    g_diastolic->setSelectable(QCP::stSingleData);
+    g_map->setSelectable(QCP::stSingleData);
+    g_pulse->setSelectable(QCP::stSingleData);
 
     replot();
 }
