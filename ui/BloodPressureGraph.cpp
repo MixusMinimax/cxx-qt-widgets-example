@@ -1,6 +1,11 @@
 #include "BloodPressureGraph.h"
-#include <QCustomPlot>
 #include "MyModel.h"
+
+#include <QBrush>
+#include <QColor>
+#include <QDateTime>
+#include <QPen>
+#include <QSharedPointer>
 
 BloodPressureGraph::BloodPressureGraph(QWidget *parent) : QCustomPlot(parent), m_model{nullptr}
 {
