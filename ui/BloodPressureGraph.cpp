@@ -1,5 +1,6 @@
 #include "BloodPressureGraph.h"
 #include "MyModel.h"
+#include "qcustomplot.h"
 
 BloodPressureGraph::BloodPressureGraph(QWidget *parent) : QCustomPlot(parent), m_model{nullptr}
 {
@@ -11,7 +12,7 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent) : QCustomPlot(parent), m
         double map{0};
         double pulse{0};
     };
-    std::vector measurements{
+    std::array measurements{
         measurement{
             .date_time = QDateTime(QDate(2026, 8, 15), QTime(17, 42)), .systolic = 135, .diastolic = 84, .pulse = 66
         },
@@ -23,7 +24,13 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent) : QCustomPlot(parent), m
         },
         measurement{
             .date_time = QDateTime(QDate(2026, 8, 29), QTime(11, 42)), .systolic = 144, .diastolic = 81, .pulse = 59
-        }
+        },
+        measurement{
+            .date_time = QDateTime(QDate(2026, 8, 29), QTime(15, 27)), .systolic = 140, .diastolic = 81, .pulse = 64
+        },
+        measurement{
+            .date_time = QDateTime(QDate(2026, 8, 29), QTime(17, 6)), .systolic = 127, .diastolic = 84, .pulse = 74
+        },
     };
     for (auto &m: measurements) {
         // Mean Arterial Pressure = 1/3*(SBP) + 2/3*(DBP)
@@ -98,6 +105,19 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent) : QCustomPlot(parent), m
     g_diastolic->setSelectable(QCP::stSingleData);
     g_map->setSelectable(QCP::stSingleData);
     g_pulse->setSelectable(QCP::stSingleData);
+
+    // selection line
+    auto selectionLine = new QCPItemStraightLine{this};
+    selectionLine->point1->setType(QCPItemPosition::ptAbsolute);
+    selectionLine->point2->setType(QCPItemPosition::ptAbsolute);
+    selectionLine->setPen(QPen{Qt::blue});
+    selectionLine->setLayer("grid");
+
+    connect(this, &QCustomPlot::mouseMove, [this, selectionLine](const QMouseEvent *e) {
+        selectionLine->point1->setCoords(e->pos().x(), 0);
+        selectionLine->point2->setCoords(e->pos().x(), 10);
+        replot();
+    });
 
     replot();
 }
