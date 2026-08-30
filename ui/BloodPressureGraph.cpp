@@ -7,22 +7,27 @@
 #include <QPen>
 #include <QSharedPointer>
 
+#include <optional>
+
 struct BloodPressureGraph::InternalState
 {
-    bool click_started{false};
-    QPoint click_start{};
+    bool   click_started = false;
+    QPoint click_start;
+
+    std::optional<const QCPGraphData *> under_cursor;
+    std::optional<const QCPGraphData *> under_cursor_at_click_start;
 };
 
-BloodPressureGraph::BloodPressureGraph(QWidget *parent) :
-    QCustomPlot(parent), m_model{nullptr}, m_state{std::make_unique<InternalState>()}
+BloodPressureGraph::BloodPressureGraph(QWidget *parent)
+    : QCustomPlot(parent), m_model{nullptr}, m_state{std::make_unique<InternalState>()}
 {
     struct measurement
     {
         QDateTime date_time;
-        double systolic{0};
-        double diastolic{0};
-        double map{0};
-        double pulse{0};
+        double    systolic  = 0;
+        double    diastolic = 0;
+        double    map       = 0;
+        double    pulse     = 0;
     };
     std::array measurements{
         measurement{
@@ -53,11 +58,11 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent) :
         m.map = 1.0 / 3 * m.systolic + 2.0 / 3 * m.diastolic;
     }
 
-    const auto g_systolic = addGraph(xAxis, yAxis);
+    const auto g_systolic  = addGraph(xAxis, yAxis);
     const auto g_diastolic = addGraph(xAxis, yAxis);
-    const auto g_map = addGraph(xAxis, yAxis);
+    const auto g_map       = addGraph(xAxis, yAxis);
 
-    const auto g_pulse = addGraph(xAxis, yAxis2);
+    const auto g_pulse     = addGraph(xAxis, yAxis2);
 
     // graph style
     const auto blood_pen = QPen{QColor{150, 33, 33, 255}, 2};
@@ -88,7 +93,7 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent) :
     });
 
     const auto first_day = measurements.front().date_time.date();
-    const auto last_day = measurements.back().date_time.date().addDays(1);
+    const auto last_day  = measurements.back().date_time.date().addDays(1);
 
     for (auto &&[date_time, systolic, diastolic, map, pulse]: measurements) {
         const auto key = QCPAxisTickerDateTime::dateTimeToKey(date_time);
@@ -129,19 +134,49 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent) :
     selectionLine->setLayer("grid");
 
     connect(this, &QCustomPlot::mousePress, [this](const QMouseEvent *e) {
-        m_state->click_started = true;
-        m_state->click_start = e->pos();
+        m_state->click_started               = true;
+        m_state->click_start                 = e->pos();
+        m_state->under_cursor_at_click_start = m_state->under_cursor;
     });
 
-    connect(this, &QCustomPlot::mouseMove, [this, selectionLine](const QMouseEvent *e) {
+    connect(this, &QCustomPlot::mouseMove, [this, selectionLine, g_systolic](const QMouseEvent *e) {
         // cancel click if we move too far
         if (m_state->click_started) {
-            const auto vec = e->pos() - m_state->click_start;
+            const auto vec    = e->pos() - m_state->click_start;
             const auto sq_len = vec.x() * vec.x() + vec.y() * vec.y();
-            if (sq_len > 10 * 10) m_state->click_started = false;
+            if (sq_len > 5 * 5) m_state->click_started = false;
         }
-        selectionLine->point1->setCoords(e->pos().x(), 0);
-        selectionLine->point2->setCoords(e->pos().x(), 10);
+        const auto find_closest = [this, g_systolic] [[nodiscard]] (
+                                      const int x_px, const double radius_px) -> std::optional<const QCPGraphData *> {
+            const auto data      = g_systolic->data();
+            const auto end_it    = data->constEnd();
+            const auto key       = xAxis->pixelToCoord(x_px);
+            const auto before_it = data->findBegin(key, true);
+            if (before_it == data->constEnd()) return std::nullopt;
+            const auto diff_before = x_px - xAxis->coordToPixel(before_it->key);
+            // before first data point:
+            if (diff_before < 0) return -diff_before <= radius_px ? std::optional{&*before_it} : std::nullopt;
+            const auto after_it = before_it + 1;
+            // after last data point:
+            if (after_it == end_it) return diff_before <= radius_px ? std::optional{&*before_it} : std::nullopt;
+            // the cursor is guaranteed to be between two points
+            const auto diff_after = xAxis->coordToPixel(after_it->key) - x_px;
+            if (diff_before > radius_px && diff_after > radius_px) return std::nullopt;
+            if (diff_before < diff_after) return &*before_it;
+            return &*after_it;
+        };
+
+        if (const auto closest = m_state->under_cursor = find_closest(e->pos().x(), 8)) {
+            selectionLine->point1->setTypeX(QCPItemPosition::ptPlotCoords);
+            selectionLine->point1->setCoords((*closest)->key, 0);
+            selectionLine->point2->setTypeX(QCPItemPosition::ptPlotCoords);
+            selectionLine->point2->setCoords((*closest)->key, 10);
+        } else {
+            selectionLine->point1->setTypeX(QCPItemPosition::ptAbsolute);
+            selectionLine->point1->setCoords(e->pos().x(), 0);
+            selectionLine->point2->setTypeX(QCPItemPosition::ptAbsolute);
+            selectionLine->point2->setCoords(e->pos().x(), 10);
+        }
         selectionLine->setVisible(true);
         replot(rpQueuedReplot);
     });
@@ -154,7 +189,10 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent) :
     connect(this, &QCustomPlot::mouseRelease, [this](QMouseEvent *event) {
         if (m_state->click_started) {
             emit mouseClick(event, m_state->click_start);
-            qDebug() << "Clicked at" << m_state->click_start;
+            auto debug = qDebug() << "Clicked at" << m_state->click_start;
+            if (m_state->under_cursor_at_click_start) {
+                debug << (*m_state->under_cursor_at_click_start)->value;
+            }
         }
     });
 

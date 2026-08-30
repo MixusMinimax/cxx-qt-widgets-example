@@ -4,21 +4,25 @@ BasedOnStyle: LLVM
 AccessModifierOffset: -4
 AlignAfterOpenBracket: DontAlign
 AlignArrayOfStructures: None
-AlignConsecutiveAssignments: false
-AlignConsecutiveDeclarations: false
+AlignConsecutiveAssignments:
+  Enabled: true
+  AcrossEmptyLines: true
+  AlignCompound: true
+AlignConsecutiveDeclarations: true
 AlignOperands: DontAlign
 AlignTrailingComments: false
-AlwaysBreakTemplateDeclarations: Yes
 AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortLambdasOnASingleLine: All
+AlwaysBreakTemplateDeclarations: Yes
 BraceWrapping:
   AfterCaseLabel: false
-  AfterClass: false
+  AfterClass: true
   AfterControlStatement: false
-  AfterEnum: false
-  AfterFunction: false
-  AfterNamespace: false
-  AfterStruct: false
-  AfterUnion: false
+  AfterEnum: true
+  AfterFunction: true
+  AfterNamespace: true
+  AfterStruct: true
+  AfterUnion: true
   AfterExternBlock: false
   BeforeCatch: false
   BeforeElse: false
@@ -27,13 +31,15 @@ BraceWrapping:
   SplitEmptyFunction: true
   SplitEmptyRecord: true
   SplitEmptyNamespace: true
+PackConstructorInitializers: NextLine
 BreakAfterOpenBracketBracedList: true
 BreakBeforeCloseBracketBracedList: true
 BreakBinaryOperations: RespectPrecedence
-BreakBeforeBraces: Mozilla
+BreakBeforeBraces: Custom
 BreakBeforeBinaryOperators: All
 BreakBeforeTernaryOperators: true
-BreakConstructorInitializers: AfterColon
+BreakConstructorInitializers: BeforeColon
+BreakFunctionDefinitionParameters: false
 ColumnLimit: 120
 ConstructorInitializerAllOnOneLineOrOnePerLine: false
 ContinuationIndentWidth: 4
@@ -49,6 +55,7 @@ IncludeIsMainRegex: '([-_](test|unittest))?$'
 IndentCaseLabels: true
 IndentWidth: 4
 InsertNewlineAtEOF: true
+LambdaBodyIndentation: Signature
 MacroBlockBegin: ''
 MacroBlockEnd: ''
 MaxEmptyLinesToKeep: 2
