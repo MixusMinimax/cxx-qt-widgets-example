@@ -24,9 +24,13 @@ public:
 
 signals:
     void mouseClick(QMouseEvent *release_event, QPoint click_start);
+    void mouseLeave(QEvent *event);
 
 private slots:
     void onSpeedChanged(int speed);
+
+protected:
+    void leaveEvent(QEvent *event) override;
 
 private:
     MyModel *m_model;

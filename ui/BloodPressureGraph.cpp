@@ -138,11 +138,17 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent) :
         if (m_state->click_started) {
             const auto vec = e->pos() - m_state->click_start;
             const auto sq_len = vec.x() * vec.x() + vec.y() * vec.y();
-            if (sq_len > 20 * 20) m_state->click_started = false;
+            if (sq_len > 10 * 10) m_state->click_started = false;
         }
         selectionLine->point1->setCoords(e->pos().x(), 0);
         selectionLine->point2->setCoords(e->pos().x(), 10);
-        replot();
+        selectionLine->setVisible(true);
+        replot(rpQueuedReplot);
+    });
+
+    connect(this, &BloodPressureGraph::mouseLeave, [this, selectionLine] {
+        selectionLine->setVisible(false);
+        replot(rpQueuedReplot);
     });
 
     connect(this, &QCustomPlot::mouseRelease, [this](QMouseEvent *event) {
@@ -178,3 +184,5 @@ void BloodPressureGraph::setModel(MyModel *model)
 auto BloodPressureGraph::model() const -> MyModel * { return m_model; }
 
 void BloodPressureGraph::onSpeedChanged(const int speed) { qDebug() << "Speed: " << speed; }
+
+void BloodPressureGraph::leaveEvent(QEvent *event) { emit mouseLeave(event); }
