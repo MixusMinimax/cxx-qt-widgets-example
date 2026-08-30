@@ -7,7 +7,14 @@
 #include <QPen>
 #include <QSharedPointer>
 
-BloodPressureGraph::BloodPressureGraph(QWidget *parent) : QCustomPlot(parent), m_model{nullptr}
+struct BloodPressureGraph::InternalState
+{
+    bool click_started{false};
+    QPoint click_start{};
+};
+
+BloodPressureGraph::BloodPressureGraph(QWidget *parent) :
+    QCustomPlot(parent), m_model{nullptr}, m_state{std::make_unique<InternalState>()}
 {
     struct measurement
     {
@@ -35,6 +42,9 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent) : QCustomPlot(parent), m
         },
         measurement{
             .date_time = QDateTime(QDate(2026, 8, 29), QTime(17, 6)), .systolic = 127, .diastolic = 84, .pulse = 74
+        },
+        measurement{
+            .date_time = QDateTime(QDate(2026, 8, 30), QTime(11, 21)), .systolic = 133, .diastolic = 91, .pulse = 57
         },
     };
     for (auto &m: measurements) {
@@ -118,10 +128,28 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent) : QCustomPlot(parent), m
     selectionLine->setPen(QPen{Qt::blue});
     selectionLine->setLayer("grid");
 
+    connect(this, &QCustomPlot::mousePress, [this](const QMouseEvent *e) {
+        m_state->click_started = true;
+        m_state->click_start = e->pos();
+    });
+
     connect(this, &QCustomPlot::mouseMove, [this, selectionLine](const QMouseEvent *e) {
+        // cancel click if we move too far
+        if (m_state->click_started) {
+            const auto vec = e->pos() - m_state->click_start;
+            const auto sq_len = vec.x() * vec.x() + vec.y() * vec.y();
+            if (sq_len > 20 * 20) m_state->click_started = false;
+        }
         selectionLine->point1->setCoords(e->pos().x(), 0);
         selectionLine->point2->setCoords(e->pos().x(), 10);
         replot();
+    });
+
+    connect(this, &QCustomPlot::mouseRelease, [this](QMouseEvent *event) {
+        if (m_state->click_started) {
+            emit mouseClick(event, m_state->click_start);
+            qDebug() << "Clicked at" << m_state->click_start;
+        }
     });
 
     replot();
