@@ -51,6 +51,9 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
         measurement{
             .date_time = QDateTime(QDate(2026, 8, 30), QTime(11, 21)), .systolic = 133, .diastolic = 91, .pulse = 57
         },
+        measurement{
+            .date_time = QDateTime(QDate(2026, 8, 31), QTime(13, 25)), .systolic = 135, .diastolic = 85, .pulse = 71
+        },
     };
     for (auto &m: measurements) {
         // Mean Arterial Pressure = 1/3*(SBP) + 2/3*(DBP)
@@ -110,8 +113,8 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
     yAxis2->setLabel(tr("Pulse (min^-1)"));
     // set ticker
     QSharedPointer<QCPAxisTickerDateTime> dateTicker(new QCPAxisTickerDateTime);
-    dateTicker->setDateTimeFormat("d. MMMM\nyyyy");
-    xAxis->setTicker(std::move(dateTicker));
+    dateTicker->setDateTimeFormat("d. MMMM\nyyyy\nhh:mm");
+    xAxis->setTicker(dateTicker);
     xAxis->setTickLabelFont(QFont(QFont().family(), 8));
     // set axes ranges, so we see all data:
     xAxis->setRange(QCPAxisTickerDateTime::dateTimeToKey(first_day), QCPAxisTickerDateTime::dateTimeToKey(last_day));
@@ -132,6 +135,25 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
     selectionLine->point2->setType(QCPItemPosition::ptAbsolute);
     selectionLine->setPen(QPen{Qt::blue});
     selectionLine->setLayer("grid");
+
+    if (QTimeZone::systemTimeZone().hasDaylightTime()) {
+        const auto adjust_ticker_for_daylight_time = [this, dateTicker = std::move(dateTicker)](
+                                                         const QCPRange &new_range) {
+            auto       dt = QCPAxisTickerDateTime::keyToDateTime(new_range.center());
+            const auto d  = dt.date();
+            if (dt.isDaylightTime()) {
+                dt = QDateTime{QDate{d.year(), 7, 1}, QTime{0, 0}};
+            } else {
+                dt = QDateTime{QDate{d.year(), 1, 1}, QTime{0, 0}};
+            }
+            if (const auto dt_ms = QCPAxisTickerDateTime::dateTimeToKey(dt); dt_ms != dateTicker->tickOrigin()) {
+                dateTicker->setTickOrigin(dt);
+                replot(rpQueuedReplot);
+            }
+        };
+        connect(xAxis, qOverload<const QCPRange &>(&QCPAxis::rangeChanged), adjust_ticker_for_daylight_time);
+        adjust_ticker_for_daylight_time(xAxis->range());
+    }
 
     connect(this, &QCustomPlot::mousePress, [this](const QMouseEvent *e) {
         m_state->click_started               = true;

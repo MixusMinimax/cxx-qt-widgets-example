@@ -36,7 +36,7 @@ BreakAfterOpenBracketBracedList: true
 BreakBeforeCloseBracketBracedList: true
 BreakBinaryOperations: RespectPrecedence
 BreakBeforeBraces: Custom
-BreakBeforeBinaryOperators: All
+BreakBeforeBinaryOperators: NonAssignment
 BreakBeforeTernaryOperators: true
 BreakConstructorInitializers: BeforeColon
 BreakFunctionDefinitionParameters: false
