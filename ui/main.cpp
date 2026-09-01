@@ -6,10 +6,11 @@
 
 #include <memory>
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
     auto controller = backend::create_async_controller();
 
-    const QApplication app(argc, argv);
+    const QApplication app{argc, argv};
 
     const auto model = std::make_unique<MyModel>();
 
@@ -26,7 +27,7 @@ int main(int argc, char *argv[]) {
 #endif
     });
 
-    const int ret = QApplication::exec();
+    const auto ret = QApplication::exec();
     controller->shutdown();
     return ret;
 }

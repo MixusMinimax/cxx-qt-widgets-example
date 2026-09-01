@@ -1,4 +1,5 @@
 #include "BloodPressureGraph.h"
+
 #include "MyModel.h"
 
 #include <QBrush>
@@ -19,7 +20,7 @@ struct BloodPressureGraph::InternalState
 };
 
 BloodPressureGraph::BloodPressureGraph(QWidget *parent)
-    : QCustomPlot(parent), m_model{nullptr}, m_state{std::make_unique<InternalState>()}
+    : QCustomPlot{parent}, m_model{nullptr}, m_state{std::make_unique<InternalState>()}
 {
     struct measurement
     {
@@ -31,28 +32,31 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
     };
     std::array measurements{
         measurement{
-            .date_time = QDateTime(QDate(2026, 8, 15), QTime(17, 42)), .systolic = 135, .diastolic = 84, .pulse = 66
+            .date_time = QDateTime{QDate{2026, 8, 15}, QTime{17, 42}}, .systolic = 135, .diastolic = 84, .pulse = 66
         },
         measurement{
-            .date_time = QDateTime(QDate(2026, 8, 24), QTime(21, 20)), .systolic = 135, .diastolic = 85, .pulse = 96
+            .date_time = QDateTime{QDate{2026, 8, 24}, QTime{21, 20}}, .systolic = 135, .diastolic = 85, .pulse = 96
         },
         measurement{
-            .date_time = QDateTime(QDate(2026, 8, 28), QTime(16, 54)), .systolic = 125, .diastolic = 81, .pulse = 74
+            .date_time = QDateTime{QDate{2026, 8, 28}, QTime{16, 54}}, .systolic = 125, .diastolic = 81, .pulse = 74
         },
         measurement{
-            .date_time = QDateTime(QDate(2026, 8, 29), QTime(11, 42)), .systolic = 144, .diastolic = 81, .pulse = 59
+            .date_time = QDateTime{QDate{2026, 8, 29}, QTime{11, 42}}, .systolic = 144, .diastolic = 81, .pulse = 59
         },
         measurement{
-            .date_time = QDateTime(QDate(2026, 8, 29), QTime(15, 27)), .systolic = 140, .diastolic = 81, .pulse = 64
+            .date_time = QDateTime{QDate{2026, 8, 29}, QTime{15, 27}}, .systolic = 140, .diastolic = 81, .pulse = 64
         },
         measurement{
-            .date_time = QDateTime(QDate(2026, 8, 29), QTime(17, 6)), .systolic = 127, .diastolic = 84, .pulse = 74
+            .date_time = QDateTime{QDate{2026, 8, 29}, QTime{17, 6}}, .systolic = 127, .diastolic = 84, .pulse = 74
         },
         measurement{
-            .date_time = QDateTime(QDate(2026, 8, 30), QTime(11, 21)), .systolic = 133, .diastolic = 91, .pulse = 57
+            .date_time = QDateTime{QDate{2026, 8, 30}, QTime{11, 21}}, .systolic = 133, .diastolic = 91, .pulse = 57
         },
         measurement{
-            .date_time = QDateTime(QDate(2026, 8, 31), QTime(13, 25)), .systolic = 135, .diastolic = 85, .pulse = 71
+            .date_time = QDateTime{QDate{2026, 8, 31}, QTime{13, 25}}, .systolic = 135, .diastolic = 85, .pulse = 71
+        },
+        measurement{
+            .date_time = QDateTime{QDate{2026, 9, 1}, QTime{16, 37}}, .systolic = 123, .diastolic = 78, .pulse = 64
         },
     };
     for (auto &m: measurements) {
@@ -67,11 +71,20 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
 
     const auto g_pulse     = addGraph(xAxis, yAxis2);
 
+    // add data
+    for (auto &&[date_time, systolic, diastolic, map, pulse]: measurements) {
+        const auto key = QCPAxisTickerDateTime::dateTimeToKey(date_time);
+        g_systolic->data()->add(QCPGraphData{key, systolic});
+        g_diastolic->data()->add(QCPGraphData{key, diastolic});
+        g_map->data()->add(QCPGraphData{key, map});
+        g_pulse->data()->add(QCPGraphData{key, pulse});
+    }
+
     // graph style
-    const auto blood_pen = QPen{QColor{150, 33, 33, 255}, 2};
+    const QPen blood_pen{QColor{150, 33, 33, 255}, 2};
     g_systolic->setPen(blood_pen);
     g_diastolic->setPen(blood_pen);
-    const auto blood_scatter = QCPScatterStyle{
+    const QCPScatterStyle blood_scatter{
         QCPScatterStyle::ssDisc,
         QPen{QColor{150, 33, 33, 255}},
         QBrush{QColor{255, 255, 255, 255}},
@@ -83,9 +96,7 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
     g_systolic->setBrush(QBrush{QColor{200, 53, 53, 84}});
     g_systolic->setChannelFillGraph(g_diastolic);
 
-    auto map_pen = QPen{QColor{255, 255, 255, 255}};
-    map_pen.setWidth(2);
-    g_map->setPen(map_pen);
+    g_map->setPen(QPen{QColor{255, 255, 255, 255}, 2});
 
     g_pulse->setPen(QPen{QColor{150, 33, 33, 255}, 2});
     g_pulse->setScatterStyle(QCPScatterStyle{
@@ -95,32 +106,7 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
         8,
     });
 
-    const auto first_day = measurements.front().date_time.date();
-    const auto last_day  = measurements.back().date_time.date().addDays(1);
-
-    for (auto &&[date_time, systolic, diastolic, map, pulse]: measurements) {
-        const auto key = QCPAxisTickerDateTime::dateTimeToKey(date_time);
-        g_systolic->data()->add(QCPGraphData(key, systolic));
-        g_diastolic->data()->add(QCPGraphData(key, diastolic));
-        g_map->data()->add(QCPGraphData(key, map));
-        g_pulse->data()->add(QCPGraphData(key, pulse));
-    }
-
-    yAxis2->setVisible(true);
-    // give the axes some labels:
-    xAxis->setLabel(tr("Date"));
-    yAxis->setLabel(tr("Pressure (mmHg)"));
-    yAxis2->setLabel(tr("Pulse (min^-1)"));
-    // set ticker
-    QSharedPointer<QCPAxisTickerDateTime> dateTicker(new QCPAxisTickerDateTime);
-    dateTicker->setDateTimeFormat("d. MMMM\nyyyy\nhh:mm");
-    xAxis->setTicker(dateTicker);
-    xAxis->setTickLabelFont(QFont(QFont().family(), 8));
-    // set axes ranges, so we see all data:
-    xAxis->setRange(QCPAxisTickerDateTime::dateTimeToKey(first_day), QCPAxisTickerDateTime::dateTimeToKey(last_day));
-    yAxis->setRange(0, 200);
-    yAxis2->setRange(20, 300);
-
+    // interactions
     axisRect()->setRangeDrag(Qt::Horizontal);
     axisRect()->setRangeZoom(Qt::Horizontal);
     setInteractions(interactions() | QCP::iRangeDrag | QCP::iRangeZoom | QCP::iSelectPlottables);
@@ -129,16 +115,33 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
     g_map->setSelectable(QCP::stSingleData);
     g_pulse->setSelectable(QCP::stSingleData);
 
+    yAxis2->setVisible(true);
+    // give the axes some labels:
+    xAxis->setLabel(tr("Date"));
+    yAxis->setLabel(tr("Pressure (mmHg)"));
+    yAxis2->setLabel(tr("Pulse (min^-1)"));
+    // set ticker
+    QSharedPointer<QCPAxisTickerDateTime> dateTicker{new QCPAxisTickerDateTime};
+    dateTicker->setDateTimeFormat("d. MMMM\nyyyy\nhh:mm");
+    xAxis->setTicker(dateTicker);
+    xAxis->setTickLabelFont(QFont{QFont{}.family(), 8});
+    // set axis ranges, so we see all data
+    // default range encompasses all values TODO: default range should probably be current week or something
+    const auto first_day = measurements.front().date_time.date();
+    const auto last_day  = measurements.back().date_time.date().addDays(1);
+    xAxis->setRange(QCPAxisTickerDateTime::dateTimeToKey(first_day), QCPAxisTickerDateTime::dateTimeToKey(last_day));
+    yAxis->setRange(0, 200);
+    yAxis2->setRange(20, 300);
+
     // selection line
-    auto selectionLine = new QCPItemStraightLine{this};
+    const auto selectionLine = new QCPItemStraightLine{this};
     selectionLine->point1->setType(QCPItemPosition::ptAbsolute);
     selectionLine->point2->setType(QCPItemPosition::ptAbsolute);
     selectionLine->setPen(QPen{Qt::blue});
     selectionLine->setLayer("grid");
 
     if (QTimeZone::systemTimeZone().hasDaylightTime()) {
-        const auto adjust_ticker_for_daylight_time = [this, dateTicker = std::move(dateTicker)](
-                                                         const QCPRange &new_range) {
+        auto adjust_ticker_for_daylight_time = [this, dateTicker = std::move(dateTicker)](const QCPRange &new_range) {
             auto       dt = QCPAxisTickerDateTime::keyToDateTime(new_range.center());
             const auto d  = dt.date();
             if (dt.isDaylightTime()) {
@@ -151,8 +154,8 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
                 replot(rpQueuedReplot);
             }
         };
-        connect(xAxis, qOverload<const QCPRange &>(&QCPAxis::rangeChanged), adjust_ticker_for_daylight_time);
         adjust_ticker_for_daylight_time(xAxis->range());
+        connect(xAxis, qOverload<const QCPRange &>(&QCPAxis::rangeChanged), std::move(adjust_ticker_for_daylight_time));
     }
 
     connect(this, &QCustomPlot::mousePress, [this](const QMouseEvent *e) {
@@ -170,6 +173,8 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
         }
         const auto find_closest = [this, g_systolic] [[nodiscard]] (
                                       const int x_px, const double radius_px) -> std::optional<const QCPGraphData *> {
+            // TODO: consider vertical distance, if cursor is close enough to data point.
+            //       Otherwise, just horizontal distance. A horizontal line with value tags on the axis would be cool.
             const auto data      = g_systolic->data();
             const auto end_it    = data->constEnd();
             const auto key       = xAxis->pixelToCoord(x_px);
