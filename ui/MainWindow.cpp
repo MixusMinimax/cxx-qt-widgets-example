@@ -31,11 +31,13 @@ MainWindow::MainWindow(rust::Box<backend::AsyncControllerHandle> tokio_handle, Q
     connect(m_ui->actionQuit, &QAction::triggered, this, &MainWindow::quit);
     connect(m_ui->actionAbout, &QAction::triggered, this, &MainWindow::about);
 
-    connect(m_ui->pushButton, &QPushButton::pressed,
-        [this] { statusBar()->showMessage(m_backend->make_message(tr("button"))); });
+    connect(m_ui->pushButton, &QPushButton::pressed, [this] {
+        statusBar()->showMessage(m_backend->make_message(tr("button")));
+    });
 
-    connect(
-        m_backend, &backend::Backend::message_received, [this](const QString &msg) { statusBar()->showMessage(msg); });
+    connect(m_backend, &backend::Backend::message_received, [this](const QString &msg) {
+        statusBar()->showMessage(msg);
+    });
 }
 
 MainWindow::~MainWindow() = default;

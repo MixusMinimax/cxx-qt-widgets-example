@@ -8,11 +8,20 @@
 #include <QPen>
 #include <QSharedPointer>
 
+#include <algorithm>
 #include <optional>
+#include <ranges>
+#include <span>
+
+template<class... Ts>
+struct overloaded : Ts...
+{
+    using Ts::operator()...;
+};
 
 struct BloodPressureGraph::InternalState
 {
-    bool   click_started = false;
+    bool click_started = false;
     QPoint click_start;
 
     std::optional<const QCPGraphData *> under_cursor;
@@ -25,10 +34,11 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
     struct measurement
     {
         QDateTime date_time;
-        double    systolic  = 0;
-        double    diastolic = 0;
-        double    map       = 0;
-        double    pulse     = 0;
+        double systolic{0};
+        double diastolic{0};
+        double map{0};
+        double pulse{0};
+        double key{0};
     };
     std::array measurements{
         measurement{
@@ -63,17 +73,17 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
         // Mean Arterial Pressure = 1/3*(SBP) + 2/3*(DBP)
         // DOI: 10.1097/CCM.0000000000000324
         m.map = 1.0 / 3 * m.systolic + 2.0 / 3 * m.diastolic;
+        m.key = QCPAxisTickerDateTime::dateTimeToKey(m.date_time);
     }
 
-    const auto g_systolic  = addGraph(xAxis, yAxis);
+    const auto g_systolic = addGraph(xAxis, yAxis);
     const auto g_diastolic = addGraph(xAxis, yAxis);
-    const auto g_map       = addGraph(xAxis, yAxis);
+    const auto g_map = addGraph(xAxis, yAxis);
 
-    const auto g_pulse     = addGraph(xAxis, yAxis2);
+    const auto g_pulse = addGraph(xAxis, yAxis2);
 
     // add data
-    for (auto &&[date_time, systolic, diastolic, map, pulse]: measurements) {
-        const auto key = QCPAxisTickerDateTime::dateTimeToKey(date_time);
+    for (auto &&[date_time, systolic, diastolic, map, pulse, key]: measurements) {
         g_systolic->data()->add(QCPGraphData{key, systolic});
         g_diastolic->data()->add(QCPGraphData{key, diastolic});
         g_map->data()->add(QCPGraphData{key, map});
@@ -99,12 +109,14 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
     g_map->setPen(QPen{QColor{255, 255, 255, 255}, 2});
 
     g_pulse->setPen(QPen{QColor{150, 33, 33, 255}, 2});
-    g_pulse->setScatterStyle(QCPScatterStyle{
-        QCPScatterStyle::ssCircle,
-        QPen{QColor{150, 33, 33, 255}},
-        QBrush{QColor{255, 255, 255, 255}},
-        8,
-    });
+    g_pulse->setScatterStyle(
+        QCPScatterStyle{
+            QCPScatterStyle::ssCircle,
+            QPen{QColor{150, 33, 33, 255}},
+            QBrush{QColor{255, 255, 255, 255}},
+            8,
+        }
+    );
 
     // interactions
     axisRect()->setRangeDrag(Qt::Horizontal);
@@ -128,7 +140,7 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
     // set axis ranges, so we see all data
     // default range encompasses all values TODO: default range should probably be current week or something
     const auto first_day = measurements.front().date_time.date();
-    const auto last_day  = measurements.back().date_time.date().addDays(1);
+    const auto last_day = measurements.back().date_time.date().addDays(1);
     xAxis->setRange(QCPAxisTickerDateTime::dateTimeToKey(first_day), QCPAxisTickerDateTime::dateTimeToKey(last_day));
     yAxis->setRange(0, 200);
     yAxis2->setRange(20, 300);
@@ -142,8 +154,8 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
 
     if (QTimeZone::systemTimeZone().hasDaylightTime()) {
         auto adjust_ticker_for_daylight_time = [this, dateTicker = std::move(dateTicker)](const QCPRange &new_range) {
-            auto       dt = QCPAxisTickerDateTime::keyToDateTime(new_range.center());
-            const auto d  = dt.date();
+            auto dt = QCPAxisTickerDateTime::keyToDateTime(new_range.center());
+            const auto d = dt.date();
             if (dt.isDaylightTime()) {
                 dt = QDateTime{QDate{d.year(), 7, 1}, QTime{0, 0}};
             } else {
@@ -159,25 +171,26 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
     }
 
     connect(this, &QCustomPlot::mousePress, [this](const QMouseEvent *e) {
-        m_state->click_started               = true;
-        m_state->click_start                 = e->pos();
+        m_state->click_started = true;
+        m_state->click_start = e->pos();
         m_state->under_cursor_at_click_start = m_state->under_cursor;
     });
 
-    connect(this, &QCustomPlot::mouseMove, [this, selectionLine, g_systolic](const QMouseEvent *e) {
+    connect(this, &QCustomPlot::mouseMove, [=, this](const QMouseEvent *e) {
         // cancel click if we move too far
         if (m_state->click_started) {
-            const auto vec    = e->pos() - m_state->click_start;
+            const auto vec = e->pos() - m_state->click_start;
             const auto sq_len = vec.x() * vec.x() + vec.y() * vec.y();
             if (sq_len > 5 * 5) m_state->click_started = false;
         }
         const auto find_closest = [this, g_systolic] [[nodiscard]] (
-                                      const int x_px, const double radius_px) -> std::optional<const QCPGraphData *> {
+                                      const int x_px, const double radius_px
+                                  ) -> std::optional<const QCPGraphData *> {
             // TODO: consider vertical distance, if cursor is close enough to data point.
             //       Otherwise, just horizontal distance. A horizontal line with value tags on the axis would be cool.
-            const auto data      = g_systolic->data();
-            const auto end_it    = data->constEnd();
-            const auto key       = xAxis->pixelToCoord(x_px);
+            const auto data = g_systolic->data();
+            const auto end_it = data->constEnd();
+            const auto key = xAxis->pixelToCoord(x_px);
             const auto before_it = data->findBegin(key, true);
             if (before_it == data->constEnd()) return std::nullopt;
             const auto diff_before = x_px - xAxis->coordToPixel(before_it->key);
@@ -193,17 +206,118 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
             return &*after_it;
         };
 
-        if (const auto closest = m_state->under_cursor = find_closest(e->pos().x(), 8)) {
-            selectionLine->point1->setTypeX(QCPItemPosition::ptPlotCoords);
-            selectionLine->point1->setCoords((*closest)->key, 0);
-            selectionLine->point2->setTypeX(QCPItemPosition::ptPlotCoords);
-            selectionLine->point2->setCoords((*closest)->key, 10);
-        } else {
-            selectionLine->point1->setTypeX(QCPItemPosition::ptAbsolute);
-            selectionLine->point1->setCoords(e->pos().x(), 0);
-            selectionLine->point2->setTypeX(QCPItemPosition::ptAbsolute);
-            selectionLine->point2->setCoords(e->pos().x(), 10);
-        }
+        enum struct data_type
+        {
+            systolic,
+            diastolic,
+            map,
+            pulse
+        };
+
+        const auto find_closest_2d = [=, this] [[nodiscard]] (
+                                         const QPoint mouse_pos, const double radius_px
+                                     ) -> std::optional<std::pair<data_type, QCPGraphData>> {
+            const auto key_left = xAxis->pixelToCoord(mouse_pos.x() - radius_px);
+            const auto key_right = xAxis->pixelToCoord(mouse_pos.x() + radius_px);
+            std::optional<std::pair<data_type, QCPGraphData>> closest_in_radius{};
+            std::optional<std::pair<data_type, QCPGraphData>> closest_horizontal{};
+            double closest_distance_sq = std::numeric_limits<double>::max();
+            double closest_horizontal_distance = std::numeric_limits<double>::max();
+            for (const auto &[type, data, yAxis]: {
+                     std::tuple{data_type::systolic, g_systolic->data(), yAxis},
+                     std::tuple{data_type::diastolic, g_diastolic->data(), yAxis},
+                     std::tuple{data_type::map, g_map->data(), yAxis},
+                     std::tuple{data_type::pulse, g_pulse->data(), yAxis2},
+                 }) {
+                for (const auto &point: std::span{data->findBegin(key_left), data->constEnd()}
+                         | std::ranges::views::take_while([&](const QCPGraphData &v) { return v.key <= key_right; })) {
+                    const auto dx = std::abs(mouse_pos.x() - xAxis->coordToPixel(point.key));
+                    const auto dy = std::abs(mouse_pos.y() - yAxis->coordToPixel(point.value));
+                    if (dx < closest_horizontal_distance) {
+                        closest_horizontal_distance = dx;
+                        closest_horizontal = {type, point};
+                    }
+                    const auto distance_sq = dx * dx + dy * dy;
+                    if (distance_sq < closest_distance_sq && distance_sq <= radius_px * radius_px) {
+                        closest_distance_sq = distance_sq;
+                        closest_in_radius = {type, point};
+                    }
+                }
+            }
+
+            return closest_in_radius ? closest_in_radius : closest_horizontal;
+        };
+
+        // use binary search to find the start of the relevant range. Then we search for the closest point in the
+        // radius. If there is none, the closest horizontal x-coordinate is used. Otherwise, nothing is found.
+        const auto find_closest_2d_b =
+            [this, &measurements](
+                const QPoint mouse_pos, const double radius_hor_px, const double radius_px
+            ) -> std::variant<std::monostate, std::pair<data_type, measurement>, measurement> {
+            const auto relevant_radius = std::max(radius_hor_px, radius_px);
+            const auto key_left = xAxis->pixelToCoord(mouse_pos.x() - relevant_radius);
+            const auto key_right = xAxis->pixelToCoord(mouse_pos.x() + relevant_radius);
+            std::optional<std::pair<data_type, const measurement *>> closest_in_radius{};
+            std::optional<const measurement *> closest_horizontal{};
+            double closest_distance_sq = std::numeric_limits<double>::max();
+            double closest_horizontal_distance = std::numeric_limits<double>::max();
+            for (const measurement &m: std::span{
+                     std::ranges::lower_bound(measurements, key_left, {}, [](const measurement &m) { return m.key; }),
+                     measurements.end()
+                 }) {
+                if (m.key > key_right) break;
+                const auto dx = std::abs(mouse_pos.x() - xAxis->coordToPixel(m.key));
+                if (dx < closest_horizontal_distance && dx <= radius_hor_px) {
+                    closest_horizontal_distance = dx;
+                    closest_horizontal = &m;
+                }
+                const auto check_value = [&](const data_type type, const double value, const QCPAxis *yAxis) {
+                    const auto dy = mouse_pos.y() - yAxis->coordToPixel(value);
+                    const auto distance_sq = dx * dx + dy * dy;
+                    if (distance_sq < closest_distance_sq && distance_sq <= radius_px * radius_px) {
+                        closest_distance_sq = distance_sq;
+                        closest_in_radius = {type, &m};
+                    }
+                };
+                check_value(data_type::systolic, m.systolic, yAxis);
+                check_value(data_type::diastolic, m.diastolic, yAxis);
+                check_value(data_type::map, m.map, yAxis);
+                check_value(data_type::pulse, m.map, yAxis2);
+            }
+            if (closest_in_radius) {
+                return std::pair{closest_in_radius->first, *closest_in_radius->second};
+            }
+            if (closest_horizontal) {
+                return **closest_horizontal;
+            }
+            return {};
+        };
+
+        std::visit(
+            overloaded{
+                [&](std::monostate) {
+                    selectionLine->point1->setTypeX(QCPItemPosition::ptAbsolute);
+                    selectionLine->point1->setCoords(e->pos().x(), 0);
+                    selectionLine->point2->setTypeX(QCPItemPosition::ptAbsolute);
+                    selectionLine->point2->setCoords(e->pos().x(), 10);
+                },
+                [&](const std::pair<data_type, measurement> &p) {
+                    const auto &[type, m] = p;
+                    selectionLine->point1->setTypeX(QCPItemPosition::ptPlotCoords);
+                    selectionLine->point1->setCoords(m.key, 0);
+                    selectionLine->point2->setTypeX(QCPItemPosition::ptPlotCoords);
+                    selectionLine->point2->setCoords(m.key, 10);
+                    // TODO: horizontal line
+                },
+                [&](const measurement &m) {
+                    selectionLine->point1->setTypeX(QCPItemPosition::ptPlotCoords);
+                    selectionLine->point1->setCoords(m.key, 0);
+                    selectionLine->point2->setTypeX(QCPItemPosition::ptPlotCoords);
+                    selectionLine->point2->setCoords(m.key, 10);
+                }
+            },
+            find_closest_2d_b(e->pos(), 8, 12)
+        );
         selectionLine->setVisible(true);
         replot(rpQueuedReplot);
     });

@@ -2,15 +2,13 @@
 Language: Cpp
 BasedOnStyle: LLVM
 AccessModifierOffset: -4
-AlignAfterOpenBracket: DontAlign
+AlignAfterOpenBracket: BlockIndent
 AlignArrayOfStructures: None
-AlignConsecutiveAssignments:
-  Enabled: true
-  AcrossEmptyLines: true
-  AlignCompound: true
-AlignConsecutiveDeclarations: true
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
 AlignOperands: DontAlign
 AlignTrailingComments: false
+AllowShortEnumsOnASingleLine: true
 AllowShortIfStatementsOnASingleLine: WithoutElse
 AllowShortLambdasOnASingleLine: All
 AlwaysBreakTemplateDeclarations: Yes
