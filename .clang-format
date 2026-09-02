@@ -26,9 +26,9 @@ BraceWrapping:
   BeforeElse: false
   BeforeLambdaBody: false
   BeforeWhile: false
-  SplitEmptyFunction: true
-  SplitEmptyRecord: true
-  SplitEmptyNamespace: true
+  SplitEmptyFunction: false
+  SplitEmptyRecord: false
+  SplitEmptyNamespace: false
 PackConstructorInitializers: NextLine
 BreakAfterOpenBracketBracedList: true
 BreakBeforeCloseBracketBracedList: true
@@ -60,6 +60,7 @@ MaxEmptyLinesToKeep: 2
 NamespaceIndentation: All
 PointerAlignment: Right
 ReflowComments: Always
+ShortNamespaceLines: 12
 SpaceAfterCStyleCast: true
 SpaceAfterTemplateKeyword: false
 SpaceBeforeRangeBasedForLoopColon: false

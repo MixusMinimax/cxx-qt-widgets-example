@@ -22,6 +22,10 @@ public:
 
     [[nodiscard]] MyModel *model() const;
 
+    void setMapSelectable(bool value);
+
+    [[nodiscard]] bool mapSelectable() const;
+
 signals:
     void mouseClick(QMouseEvent *release_event, QPoint click_start);
     void mouseLeave(QEvent *event);
@@ -33,6 +37,7 @@ protected:
     void leaveEvent(QEvent *event) override;
 
 private:
+    bool m_mapSelectable{true};
     MyModel *m_model;
     std::array<QMetaObject::Connection, 1> m_modelConnections;
 

@@ -18,6 +18,8 @@ MainWindow::MainWindow(rust::Box<backend::AsyncControllerHandle> tokio_handle, Q
 
     statusBar()->showMessage(tr("Hello World!"));
 
+    m_ui->graphOutput->setMapSelectable(false);
+
     m_ui->actionNew->setShortcuts(QKeySequence::New);
     m_ui->actionOpen->setShortcuts(QKeySequence::Open);
     m_ui->actionSave->setShortcuts(QKeySequence::Save);
