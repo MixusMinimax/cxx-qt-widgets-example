@@ -27,7 +27,7 @@ public:
     [[nodiscard]] bool mapSelectable() const;
 
 signals:
-    void mouseClick(QMouseEvent *release_event, QPoint click_start);
+    void mouseClick(QMouseEvent *release_event, QPointF click_start);
     void mouseLeave(QEvent *event);
 
 private slots:
