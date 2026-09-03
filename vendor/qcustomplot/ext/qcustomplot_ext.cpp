@@ -62,7 +62,7 @@ QCPAxisTag::QCPAxisTag(QCPAxis *parent_axis) : QObject{parent_axis}, mAxis{paren
             break;
     }
 
-    setPosition(0);
+    setValue(0);
 }
 
 QCPAxisTag::~QCPAxisTag()
@@ -81,7 +81,7 @@ void QCPAxisTag::setVisible(const bool on) { mLabel->setVisible(on); }
 
 void QCPAxisTag::setTagSize(const int size) { mLabel->setTagSize(size); }
 
-void QCPAxisTag::setPosition(const double value)
+void QCPAxisTag::setValue(const double value)
 {
     switch (mAxis->axisType()) {
         case QCPAxis::atLeft:

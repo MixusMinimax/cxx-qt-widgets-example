@@ -1,3 +1,16 @@
+/***************************************************************************
+**                                                                        **
+**  Extensions for QCustomPlot                                            **
+**  Copyright (C) 2026 Maxi Barmetler                                     **
+**  QCustomPlot is created by Emanuel Eichhammer:                         **
+**  Copyright (C) 2011-2022 Emanuel Eichhammer                            **
+**                                                                        **
+**  This file is subject to the                                           **
+**  GNU GENERAL PUBLIC LICENSE, Version 3.                                **
+**  A copy can be found at ../GPL.txt.                                    **
+**                                                                        **
+****************************************************************************/
+
 #ifndef QCUSTOMPLOT_EXT_H
 #define QCUSTOMPLOT_EXT_H
 
@@ -10,6 +23,13 @@
 class QCPAxisTag;
 class QCPItemTextTag;
 
+/*!
+    This class is based on https://www.qcustomplot.com/index.php/tutorials/specialcases/axistags with modifications.
+
+    This tag renders as a rectangle with one edge pointy, depending on the position of the supplied axis.
+    It works with horizontal and vertical axes.
+    By default, the y-coordinate is in plot-space.
+ */
 class QCPAxisTag : QObject
 {
     Q_OBJECT
@@ -23,7 +43,7 @@ public:
     void setText(const QString &text);
     void setVisible(bool on);
     void setTagSize(int size);
-    void setPosition(double value);
+    void setValue(double value);
 
     Q_REQUIRED_RESULT QPen pen() const;
     Q_REQUIRED_RESULT QBrush brush() const;
@@ -34,7 +54,7 @@ public:
     Q_REQUIRED_RESULT QCPItemPosition *position() const;
 
 protected:
-    QCPAxis *mAxis;
+    QPointer<QCPAxis> mAxis;
     QPointer<QCPItemTracer> mDummyTracer;
     QPointer<QCPItemTextTag> mLabel;
 };

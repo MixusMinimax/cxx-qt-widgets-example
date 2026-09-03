@@ -77,6 +77,9 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
         measurement{
             .date_time = QDateTime{QDate{2026, 9, 2}, QTime{17, 01}}, .systolic = 130, .diastolic = 75, .pulse = 64
         },
+        measurement{
+            .date_time = QDateTime{QDate{2026, 9, 3}, QTime{17, 32}}, .systolic = 130, .diastolic = 83, .pulse = 61
+        },
     };
     for (auto &m: measurements) {
         // Mean Arterial Pressure = 1/3*(SBP) + 2/3*(DBP)
@@ -183,8 +186,10 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
     const auto pulse_tag = new QCPAxisTag{yAxis2};
     pressure_tag->setPen(QPen{pressure_color});
     pressure_tag->setBrush(QBrush{pressure_color_light});
+    pressure_tag->setVisible(false);
     pulse_tag->setPen(QPen{pulse_color});
     pulse_tag->setBrush(QBrush{pulse_color_light});
+    pulse_tag->setVisible(false);
 
     // effects
     if (QTimeZone::systemTimeZone().hasDaylightTime()) {
@@ -333,17 +338,20 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
         value_line->setVisible(true);
         const auto mmHg = yAxis->pixelToCoord(snapped_pos.y());
         pressure_tag->setVisible(
-            pressure_tag_visible == tag_visibility::visible
-            || pressure_tag_visible == tag_visibility::automatic && mmHg >= 55
+            yAxis->range().contains(mmHg)
+            && (pressure_tag_visible == tag_visibility::visible
+                || pressure_tag_visible == tag_visibility::automatic && mmHg >= 55)
         );
-        pressure_tag->setPosition(mmHg);
+        pressure_tag->setValue(mmHg);
         pressure_tag->setText(QString::number(mmHg, 'g', 3));
 
         const auto bpm = yAxis2->pixelToCoord(snapped_pos.y());
         pulse_tag->setVisible(
-            pulse_tag_visible == tag_visibility::visible || pulse_tag_visible == tag_visibility::automatic && bpm <= 125
+            yAxis2->range().contains(bpm)
+            && (pulse_tag_visible == tag_visibility::visible
+                || pulse_tag_visible == tag_visibility::automatic && bpm <= 125)
         );
-        pulse_tag->setPosition(bpm);
+        pulse_tag->setValue(bpm);
         pulse_tag->setText(QString::number(bpm, 'g', 3));
 
         replot(rpQueuedReplot);
