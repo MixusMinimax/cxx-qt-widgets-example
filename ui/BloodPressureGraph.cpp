@@ -244,8 +244,8 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
                 const QPointF mouse_pos, const double radius_hor_px, const double radius_px, const bool clip_radius
             ) -> std::variant<std::monostate, std::tuple<data_type, measurement, double, QCPAxis *>, measurement> {
             const auto relevant_radius = clip_radius ? radius_hor_px : std::max(radius_hor_px, radius_px);
-            const auto key_left = xAxis->pixelToCoord(mouse_pos.x() - relevant_radius);
-            const auto key_right = xAxis->pixelToCoord(mouse_pos.x() + relevant_radius);
+            const auto key_left = xAxis->range().clamp(xAxis->pixelToCoord(mouse_pos.x() - relevant_radius));
+            const auto key_right = xAxis->range().clamp(xAxis->pixelToCoord(mouse_pos.x() + relevant_radius));
             std::optional<std::tuple<data_type, const measurement *, double, QCPAxis *>> closest_in_radius{};
             std::optional<const measurement *> closest_horizontal{};
             auto closest_distance_sq = std::numeric_limits<double>::max();

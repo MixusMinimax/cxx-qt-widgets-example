@@ -861,6 +861,7 @@ public:
   QCPRange sanitizedForLogScale() const;
   QCPRange sanitizedForLinScale() const;
   bool contains(double value) const { return value >= lower && value <= upper; }
+  Q_REQUIRED_RESULT double clamp(const double value) const { return qMax(lower, qMin(upper, value)); }
   
   static bool validRange(double lower, double upper);
   static bool validRange(const QCPRange &range);
@@ -2215,7 +2216,7 @@ public:
   AxisType axisType() const { return mAxisType; }
   QCPAxisRect *axisRect() const { return mAxisRect; }
   ScaleType scaleType() const { return mScaleType; }
-  const QCPRange range() const { return mRange; }
+  const QCPRange &range() const { return mRange; }
   bool rangeReversed() const { return mRangeReversed; }
   QSharedPointer<QCPAxisTicker> ticker() const { return mTicker; }
   bool ticks() const { return mTicks; }
