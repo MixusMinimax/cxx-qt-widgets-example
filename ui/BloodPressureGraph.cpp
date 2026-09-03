@@ -147,16 +147,19 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
     g_map->setSelectable(QCP::stSingleData);
     g_pulse->setSelectable(QCP::stSingleData);
 
-    yAxis2->setVisible(true);
     // give the axes some labels:
     xAxis->setLabel(tr("Date"));
     yAxis->setLabel(tr("Pressure (mmHg)"));
     yAxis2->setLabel(tr("Pulse (min^-1)"));
+    yAxis2->setVisible(true);
     // set ticker
     QSharedPointer<QCPAxisTickerDateTime> dateTicker{new QCPAxisTickerDateTime};
     dateTicker->setDateTimeFormat("d. MMMM\nyyyy\nhh:mm");
     xAxis->setTicker(dateTicker);
     xAxis->setTickLabelFont(QFont{QFont{}.family(), 8});
+    xAxis->grid()->setSubGridVisible(true);
+    yAxis->grid()->setSubGridVisible(true);
+
     // set axis ranges, so we see all data
     // default range encompasses all values TODO: default range should probably be current week or something
     const auto first_day = measurements.front().date_time.date();

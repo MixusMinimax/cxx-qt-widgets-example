@@ -6682,6 +6682,7 @@ double QCPAxisTickerDateTime::getTickStep(const QCPRange &range)
 int QCPAxisTickerDateTime::getSubTickCount(double tickStep)
 {
   int result = QCPAxisTicker::getSubTickCount(tickStep);
+  if (tickStep > 1e9) return result; // qRound fails if the number is too big
   switch (qRound(tickStep)) // hand chosen subticks for specific minute/hour/day/week/month range (as specified in getTickStep)
   {
     case 5*60: result = 4; break;
@@ -21870,7 +21871,7 @@ void QCPGraph::getOptimizedScatterData(QVector<QCPGraphData> *scatterData, QCPGr
         if (intervalDataCount >= 2) // last pixel had multiple data points, consolidate them
         {
           // determine value pixel span and add as many points in interval to maintain certain vertical data density (this is specific to scatter plot):
-          double valuePixelSpan = qAbs(valueAxis->coordToPixel(minValue)-valueAxis->coordToPixel(maxValue));
+          double valuePixelSpan = qMax(1.0, qAbs(valueAxis->coordToPixel(minValue)-valueAxis->coordToPixel(maxValue)));
           int dataModulo = qMax(1, qRound(intervalDataCount/(valuePixelSpan/4.0))); // approximately every 4 value pixels one data point on average
           QCPGraphDataContainer::const_iterator intervalIt = currentIntervalStart;
           int c = 0;
@@ -21913,7 +21914,7 @@ void QCPGraph::getOptimizedScatterData(QVector<QCPGraphData> *scatterData, QCPGr
     if (intervalDataCount >= 2) // last pixel had multiple data points, consolidate them
     {
       // determine value pixel span and add as many points in interval to maintain certain vertical data density (this is specific to scatter plot):
-      double valuePixelSpan = qAbs(valueAxis->coordToPixel(minValue)-valueAxis->coordToPixel(maxValue));
+      double valuePixelSpan = qMax(1.0, qAbs(valueAxis->coordToPixel(minValue)-valueAxis->coordToPixel(maxValue)));
       int dataModulo = qMax(1, qRound(intervalDataCount/(valuePixelSpan/4.0))); // approximately every 4 value pixels one data point on average
       QCPGraphDataContainer::const_iterator intervalIt = currentIntervalStart;
       int intervalItIndex = int(intervalIt-mDataContainer->constBegin());
@@ -29793,7 +29794,7 @@ double QCPItemText::selectTest(const QPointF &pos, bool onlySelectable, QVariant
   Q_UNUSED(details)
   if (onlySelectable && !mSelectable)
     return -1;
-  
+
   // The rect may be rotated, so we transform the actual clicked pos to the rotated
   // coordinate system, so we can use the normal rectDistance function for non-rotated rects:
   QPointF positionPixels(position->pixelPosition());

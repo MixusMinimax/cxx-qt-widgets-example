@@ -1,3 +1,5 @@
 DisableFormat: true
 SortIncludes:
   Enabled: false
+IndentWidth: 2
+TabWidth: 2
