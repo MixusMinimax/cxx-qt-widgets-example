@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <optional>
 #include <span>
+#include <vector>
 
 namespace
 {
@@ -42,7 +43,7 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
         double pulse{0};
         double key{0};
     };
-    std::array measurements{
+    std::vector measurements{
         measurement{
             .date_time = QDateTime{QDate{2026, 8, 15}, QTime{17, 42}}, .systolic = 135, .diastolic = 84, .pulse = 66
         },
@@ -73,6 +74,9 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
         measurement{
             .date_time = QDateTime{QDate{2026, 9, 2}, QTime{13, 00}}, .systolic = 131, .diastolic = 86, .pulse = 56
         },
+        measurement{
+            .date_time = QDateTime{QDate{2026, 9, 2}, QTime{17, 01}}, .systolic = 130, .diastolic = 75, .pulse = 64
+        },
     };
     for (auto &m: measurements) {
         // Mean Arterial Pressure = 1/3*(SBP) + 2/3*(DBP)
@@ -96,29 +100,37 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
     }
 
     // graph style
-    const QPen blood_pen{QColor{150, 33, 33, 255}, 2};
-    g_systolic->setPen(blood_pen);
-    g_diastolic->setPen(blood_pen);
+
+    constexpr QColor pressure_color{75, 75, 190};
+    constexpr QColor pressure_color_bg{53, 53, 200, 84};
+    constexpr QColor pressure_color_light{210, 210, 250};
+    constexpr QColor pulse_color{150, 33, 33};
+    constexpr QColor pulse_color_bg{200, 53, 53, 84};
+    constexpr QColor pulse_color_light{250, 210, 210};
+
+    g_systolic->setPen(QPen{pressure_color, 2});
+    g_diastolic->setPen(QPen{pressure_color, 2});
     const QCPScatterStyle blood_scatter{
         QCPScatterStyle::ssDisc,
-        QPen{QColor{150, 33, 33, 255}},
-        QBrush{QColor{255, 255, 255, 255}},
+        QPen{pressure_color},
+        QBrush{pressure_color},
         6,
     };
     g_systolic->setScatterStyle(blood_scatter);
     g_diastolic->setScatterStyle(blood_scatter);
 
-    g_systolic->setBrush(QBrush{QColor{200, 53, 53, 84}});
+    g_systolic->setBrush(QBrush{pressure_color_bg});
+    g_systolic->setBrush(QBrush{pressure_color_bg});
     g_systolic->setChannelFillGraph(g_diastolic);
 
-    g_map->setPen(QPen{QColor{255, 255, 255, 255}, 2});
+    g_map->setPen(QPen{Qt::white, 2});
 
-    g_pulse->setPen(QPen{QColor{150, 33, 33, 255}, 2});
+    g_pulse->setPen(QPen{pulse_color, 2});
     g_pulse->setScatterStyle(
         QCPScatterStyle{
             QCPScatterStyle::ssCircle,
-            QPen{QColor{150, 33, 33, 255}},
-            QBrush{QColor{255, 255, 255, 255}},
+            QPen{pulse_color},
+            QBrush{Qt::white},
             8,
         }
     );
@@ -154,17 +166,27 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
     const auto selection_line = new QCPItemStraightLine{this};
     selection_line->point1->setType(QCPItemPosition::ptAbsolute);
     selection_line->point2->setType(QCPItemPosition::ptAbsolute);
-    selection_line->setPen(QPen{Qt::blue});
+    selection_line->setPen(QPen{Qt::darkBlue});
     selection_line->setLayer("grid");
     selection_line->setVisible(false);
+    selection_line->setAntialiased(false);
 
     const auto value_line = new QCPItemStraightLine{this};
     value_line->point1->setType(QCPItemPosition::ptAbsolute);
     value_line->point2->setType(QCPItemPosition::ptAbsolute);
-    value_line->setPen(QPen{Qt::blue, 1, Qt::DashLine});
+    value_line->setPen(QPen{Qt::darkBlue, 1, Qt::DashLine});
     value_line->setLayer("grid");
     value_line->setVisible(false);
+    value_line->setAntialiased(false);
 
+    const auto pressure_tag = new QCPAxisTag{yAxis};
+    const auto pulse_tag = new QCPAxisTag{yAxis2};
+    pressure_tag->setPen(QPen{pressure_color});
+    pressure_tag->setBrush(QBrush{pressure_color_light});
+    pulse_tag->setPen(QPen{pulse_color});
+    pulse_tag->setBrush(QBrush{pulse_color_light});
+
+    // effects
     if (QTimeZone::systemTimeZone().hasDaylightTime()) {
         auto adjust_ticker_for_daylight_time = [this, dateTicker = std::move(dateTicker)](const QCPRange &new_range) {
             auto dt = QCPAxisTickerDateTime::keyToDateTime(new_range.center());
@@ -211,9 +233,9 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
         // radius. If there is none, the closest horizontal x-coordinate is used. Otherwise, nothing is found.
         const auto find_closest_2d_b =
             [this, &measurements](
-                const QPointF mouse_pos, const double radius_hor_px, const double radius_px
+                const QPointF mouse_pos, const double radius_hor_px, const double radius_px, const bool clip_radius
             ) -> std::variant<std::monostate, std::tuple<data_type, measurement, double, QCPAxis *>, measurement> {
-            const auto relevant_radius = std::max(radius_hor_px, radius_px);
+            const auto relevant_radius = clip_radius ? radius_hor_px : std::max(radius_hor_px, radius_px);
             const auto key_left = xAxis->pixelToCoord(mouse_pos.x() - relevant_radius);
             const auto key_right = xAxis->pixelToCoord(mouse_pos.x() + relevant_radius);
             std::optional<std::tuple<data_type, const measurement *, double, QCPAxis *>> closest_in_radius{};
@@ -253,7 +275,17 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
             return {};
         };
 
-        std::visit(
+        enum struct tag_visibility
+        {
+            automatic,
+            visible,
+            invisible,
+        };
+
+        tag_visibility pressure_tag_visible{};
+        tag_visibility pulse_tag_visible{};
+
+        const auto snapped_pos = std::visit(
             overloaded{
                 [&](std::monostate) {
                     selection_line->point1->setTypeX(QCPItemPosition::ptAbsolute);
@@ -264,6 +296,7 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
                     value_line->point1->setCoords(0, pos.y());
                     value_line->point2->setTypeY(QCPItemPosition::ptAbsolute);
                     value_line->point2->setCoords(10, pos.y());
+                    return pos;
                 },
                 [&](const std::tuple<data_type, measurement, double, QCPAxis *> &p) {
                     const auto &[type, m, value, yAxis] = p;
@@ -277,6 +310,10 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
                     value_line->point2->setTypeY(QCPItemPosition::ptPlotCoords);
                     value_line->point2->setAxes(xAxis, yAxis);
                     value_line->point2->setCoords(10, value);
+                    pressure_tag_visible =
+                        type != data_type::pulse ? tag_visibility::visible : tag_visibility::invisible;
+                    pulse_tag_visible = type == data_type::pulse ? tag_visibility::visible : tag_visibility::invisible;
+                    return QPointF{xAxis->coordToPixel(m.key), yAxis->coordToPixel(value)};
                 },
                 [&](const measurement &m) {
                     selection_line->point1->setTypeX(QCPItemPosition::ptPlotCoords);
@@ -287,18 +324,36 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
                     value_line->point1->setCoords(0, pos.y());
                     value_line->point2->setTypeY(QCPItemPosition::ptAbsolute);
                     value_line->point2->setCoords(10, pos.y());
+                    return QPointF{xAxis->coordToPixel(m.key), pos.y()};
                 }
             },
-            find_closest_2d_b(e->pos(), 8, 10)
+            find_closest_2d_b(e->pos(), 10, 20, true)
         );
         selection_line->setVisible(true);
         value_line->setVisible(true);
+        const auto mmHg = yAxis->pixelToCoord(snapped_pos.y());
+        pressure_tag->setVisible(
+            pressure_tag_visible == tag_visibility::visible
+            || pressure_tag_visible == tag_visibility::automatic && mmHg >= 55
+        );
+        pressure_tag->setPosition(mmHg);
+        pressure_tag->setText(QString::number(mmHg, 'g', 3));
+
+        const auto bpm = yAxis2->pixelToCoord(snapped_pos.y());
+        pulse_tag->setVisible(
+            pulse_tag_visible == tag_visibility::visible || pulse_tag_visible == tag_visibility::automatic && bpm <= 125
+        );
+        pulse_tag->setPosition(bpm);
+        pulse_tag->setText(QString::number(bpm, 'g', 3));
+
         replot(rpQueuedReplot);
     });
 
-    connect(this, &BloodPressureGraph::mouseLeave, [this, selection_line, value_line] {
+    connect(this, &BloodPressureGraph::mouseLeave, [this, selection_line, value_line, pressure_tag, pulse_tag] {
         selection_line->setVisible(false);
         value_line->setVisible(false);
+        pressure_tag->setVisible(false);
+        pulse_tag->setVisible(false);
         replot(rpQueuedReplot);
     });
 

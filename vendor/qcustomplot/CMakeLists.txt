@@ -1,4 +1,4 @@
-add_library(qcustomplot qcustomplot.cpp)
+add_library(qcustomplot qcustomplot.cpp ext/qcustomplot_ext.cpp)
 
 target_include_directories(qcustomplot PUBLIC .)
 

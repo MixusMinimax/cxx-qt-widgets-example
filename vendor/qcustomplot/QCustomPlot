@@ -1,1 +1,2 @@
 #include <qcustomplot.h>
+#include <ext/qcustomplot_ext.h>
