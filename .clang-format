@@ -42,6 +42,8 @@ ColumnLimit: 120
 ConstructorInitializerAllOnOneLineOrOnePerLine: false
 ContinuationIndentWidth: 4
 Cpp11BracedListStyle: true
+ExperimentalAutoDetectBinPacking: true
+BinPackArguments: false
 IncludeCategories:
   - Regex: '^<.*'
     Priority: 1

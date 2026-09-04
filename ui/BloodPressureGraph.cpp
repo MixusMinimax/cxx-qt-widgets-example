@@ -16,24 +16,16 @@
 
 namespace
 {
+    using namespace measurements;
+
     template<class... Ts>
     struct overloaded : Ts...
     {
         using Ts::operator()...;
     };
-
-    struct measurement
-    {
-        QDateTime date_time;
-        double systolic{0};
-        double diastolic{0};
-        double map{0};
-        double pulse{0};
-        double key{0};
-    };
 } // namespace
 
-static QDebug operator<<(QDebug d, const measurement &m)
+QDebug measurements::operator<<(QDebug d, const measurement &m)
 {
     return d.nospace()
         << "{date_time: "
@@ -51,10 +43,135 @@ static QDebug operator<<(QDebug d, const measurement &m)
         << '}';
 }
 
+QCPMeasurementPreview::QCPMeasurementPreview(QCustomPlot *parentPlot)
+    : QCPItemText{parentPlot}, m_dateTimeFormat{"hh:mm:ss\ndd.MM.yy"}
+{}
+
+void QCPMeasurementPreview::setMeasurement(const measurement &m)
+{
+    if (m_measurement == m) return;
+    m_measurement = m;
+    updateText();
+}
+
+void QCPMeasurementPreview::setDateTimeFormat(const QString &format)
+{
+    if (m_dateTimeFormat == format) return;
+    m_dateTimeFormat = format;
+    updateText();
+}
+
+void QCPMeasurementPreview::setDateTimeFormat(QString &&format)
+{
+    if (m_dateTimeFormat == format) return;
+    m_dateTimeFormat = std::move(format);
+    updateText();
+}
+
+void QCPMeasurementPreview::updateText()
+{
+    const auto locale = QLocale{};
+    m_rows = {
+        std::pair{tr("Systolic:"), tr("%1 mmHg").arg(locale.toString(m_measurement.systolic, 'g', 3))},
+        std::pair{tr("Diastolic:"), tr("%1 mmHg").arg(locale.toString(m_measurement.diastolic, 'g', 3))},
+        std::pair{tr("Map:"), tr("%1 mmHg").arg(locale.toString(m_measurement.map, 'g', 3))},
+        std::pair{tr("Pulse:"), tr("%1 / min").arg(locale.toString(m_measurement.pulse, 'g', 3))},
+        std::pair{tr("Date:"), locale.toString(m_measurement.date_time, m_dateTimeFormat)}
+    };
+}
+
+void QCPMeasurementPreview::draw(QCPPainter *painter)
+{
+    auto pos = position->pixelPosition();
+    const auto axis_rect = position->axisRect();
+    painter->setFont(mainFont());
+    const auto font_metrics = painter->fontMetrics();
+    std::array<std::pair<QRect, QRect>, 5> rects{};
+    int max_width_left{0};
+    int max_width_right{0};
+    int total_height{0};
+    for (std::size_t i = 0; i < 5; ++i) {
+        const auto [left, right] = rects[i] = {
+            font_metrics.boundingRect(0, 0, 0, 0, Qt::TextDontClip | mTextAlignment, m_rows[i].first),
+            font_metrics.boundingRect(0, 0, 0, 0, Qt::TextDontClip | mTextAlignment, m_rows[i].second),
+        };
+        max_width_left = std::max(max_width_left, left.width());
+        max_width_right = std::max(max_width_right, right.width());
+        total_height += std::max(left.height(), right.height());
+    }
+    auto text_box_rect = QRect{0, 0, max_width_left + 1 + m_columnGap + max_width_right, total_height}.adjusted(
+        -mPadding.left(), -mPadding.top(), mPadding.right(), mPadding.bottom()
+    );
+    const auto text_pos = getTextDrawPoint(
+        QPointF(0, 0), text_box_rect, mPositionAlignment
+    ); // 0, 0 because the transform does the translation
+    rects[0].first.moveTopLeft(text_pos.toPoint() + QPoint(mPadding.left(), mPadding.top()));
+    rects[0].second.moveTopLeft(rects[0].first.topLeft() + QPoint{max_width_left + m_columnGap, 0});
+    for (std::size_t i = 0; i < 5; ++i) {
+        if (i != 0) {
+            const auto top = std::max(rects[i - 1].first.bottom() + 1, rects[i - 1].second.bottom() + 1);
+            rects[i].first.moveLeft(rects[i - 1].first.left());
+            rects[i].first.moveTop(top);
+            rects[i].second.moveLeft(rects[i - 1].second.left());
+            rects[i].second.moveTop(top);
+        }
+    }
+    text_box_rect.moveTopLeft(text_pos.toPoint());
+    const auto clip_pad = qCeil(mainPen().widthF());
+    const auto bounding_rect = text_box_rect.adjusted(-clip_pad, -clip_pad, clip_pad, clip_pad);
+    if (mPositionAlignment.testFlag(Qt::AlignVCenter)) {
+        // I don't really care about the other cases because I'm not using them
+        pos.ry() = std::max(
+            axis_rect->top() + bounding_rect.height() / 2.0 + 4,
+            std::min(axis_rect->bottom() - bounding_rect.height() / 2.0 - 4, pos.y())
+        );
+    }
+    auto transform = painter->transform();
+    transform.translate(pos.x(), pos.y());
+    if (!qFuzzyIsNull(mRotation)) transform.rotate(mRotation);
+
+    if (transform.mapRect(bounding_rect).intersects(painter->transform().mapRect(clipRect()))) {
+        painter->setTransform(transform);
+        if ((mainBrush().style() != Qt::NoBrush && mainBrush().color().alpha() != 0)
+            || (mainPen().style() != Qt::NoPen && mainPen().color().alpha() != 0)) {
+            painter->setPen(mainPen());
+            painter->setBrush(mainBrush());
+            painter->drawRect(text_box_rect);
+        }
+
+        for (std::size_t i = 0; i < 5; ++i) {
+            if (TYPES[i]
+                && TYPES[i] == m_highlight
+                && m_highlightBrushes[i] != Qt::NoBrush
+                && m_highlightBrushes[i].color().alpha() != 0) {
+                painter->setPen(Qt::NoPen);
+                painter->setBrush(m_highlightBrushes[i]);
+                const auto r = rects[i].first.united(rects[i].second);
+                painter->drawRect(r);
+            }
+
+            if (TYPES[i]
+                && TYPES[i] == m_highlight
+                && m_highlightPens[i] != Qt::NoPen
+                && m_highlightPens[i].color().alpha() != 0) {
+                painter->setPen(m_highlightPens[i]);
+            } else if (m_pens[i] != Qt::NoPen && m_pens[i].color().alpha() != 0) {
+                painter->setPen(m_pens[i]);
+            } else {
+                painter->setPen(QPen{mainColor()});
+            }
+            painter->setBrush(Qt::NoBrush);
+            painter->drawText(rects[i].first, m_rows[i].first, QTextOption{mTextAlignment});
+            painter->drawText(rects[i].second, m_rows[i].second, QTextOption{mTextAlignment});
+        }
+    }
+}
+
 struct BloodPressureGraph::InternalState
 {
     bool click_started = false;
     QPointF click_start;
+    std::chrono::high_resolution_clock::time_point click_start_time;
 
     std::optional<measurement> under_cursor;
     std::optional<measurement> under_cursor_at_click_start;
@@ -242,9 +359,20 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
     pulse_tag->position()->setTypeY(QCPItemPosition::ptAbsolute);
     pulse_tag->setValue(0);
 
-    const auto measurement_preview = new QCPItemRect{this};
+    auto measurement_preview = new QCPMeasurementPreview{this};
+    measurement_preview->setVisible(false);
     measurement_preview->setPen(QPen{Qt::black});
+    measurement_preview->setPens({pressure_color, pressure_color, pressure_color, pulse_color, Qt::NoPen});
     measurement_preview->setBrush(QBrush{Qt::white});
+    measurement_preview->setHighlightBrushes(
+        {pressure_color_light, pressure_color_light, pressure_color_light, pulse_color_light, Qt::NoBrush}
+    );
+    measurement_preview->setPositionAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    measurement_preview->setPadding({3, 3, 3, 3});
+    measurement_preview->setColumnGap(8);
+    measurement_preview->setDateTimeFormat("dd.MM.yy @ hh:mm");
+    measurement_preview->position->setParentAnchor(cursor_tracer->position);
+    measurement_preview->position->setCoords(10, 0);
 
     // effects
     if (QTimeZone::systemTimeZone().hasDaylightTime()) {
@@ -267,9 +395,12 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
 
     connect(this, &QCustomPlot::mousePress, [this](const QMouseEvent *e) {
         m_state->click_started = true;
+        m_state->click_start_time = std::chrono::high_resolution_clock::now();
         m_state->click_start = e->position();
         m_state->under_cursor_at_click_start = m_state->under_cursor;
     });
+
+    static const int MIN_DRAG_DISTANCE = QApplication::startDragDistance();
 
     connect(this, &QCustomPlot::mouseMove, [=, this](const QMouseEvent *e) {
         const auto pos = e->position();
@@ -278,27 +409,20 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
         if (m_state->click_started) {
             const auto vec = pos - m_state->click_start;
             const auto sq_len = vec.x() * vec.x() + vec.y() * vec.y();
-            if (sq_len > 5 * 5) m_state->click_started = false;
+            if (sq_len > MIN_DRAG_DISTANCE * MIN_DRAG_DISTANCE) m_state->click_started = false;
         }
-
-        enum struct data_type
-        {
-            systolic,
-            diastolic,
-            map,
-            pulse
-        };
 
         // use binary search to find the start of the relevant range. Then we search for the closest point in the
         // radius. If there is none, the closest horizontal x-coordinate is used. Otherwise, nothing is found.
         const auto find_closest =
             [this, &measurements](
                 const QPointF mouse_pos, const double radius_hor_px, const double radius_px, const bool clip_radius
-            ) -> std::variant<std::monostate, std::tuple<data_type, measurement, double, QCPAxis *>, measurement> {
+            )
+            -> std::variant<std::monostate, std::tuple<measurement_type, measurement, double, QCPAxis *>, measurement> {
             const auto relevant_radius = clip_radius ? radius_hor_px : std::max(radius_hor_px, radius_px);
             const auto key_left = xAxis->range().clamp(xAxis->pixelToCoord(mouse_pos.x() - relevant_radius));
             const auto key_right = xAxis->range().clamp(xAxis->pixelToCoord(mouse_pos.x() + relevant_radius));
-            std::optional<std::tuple<data_type, const measurement *, double, QCPAxis *>> closest_in_radius{};
+            std::optional<std::tuple<measurement_type, const measurement *, double, QCPAxis *>> closest_in_radius{};
             std::optional<const measurement *> closest_horizontal{};
             auto closest_distance_sq = std::numeric_limits<double>::max();
             auto closest_horizontal_distance = std::numeric_limits<double>::max();
@@ -312,7 +436,7 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
                     closest_horizontal_distance = dx;
                     closest_horizontal = &m;
                 }
-                const auto check_value = [&](const data_type type, const double value, QCPAxis *yAxis) {
+                const auto check_value = [&](const measurement_type type, const double value, QCPAxis *yAxis) {
                     const auto dy = mouse_pos.y() - yAxis->coordToPixel(value);
                     const auto distance_sq = dx * dx + dy * dy;
                     if (distance_sq < closest_distance_sq && distance_sq <= radius_px * radius_px) {
@@ -320,10 +444,10 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
                         closest_in_radius = {type, &m, value, yAxis};
                     }
                 };
-                check_value(data_type::systolic, m.systolic, yAxis);
-                check_value(data_type::diastolic, m.diastolic, yAxis);
-                if (m_mapSelectable) check_value(data_type::map, m.map, yAxis);
-                check_value(data_type::pulse, m.pulse, yAxis2);
+                check_value(measurement_type::systolic, m.systolic, yAxis);
+                check_value(measurement_type::diastolic, m.diastolic, yAxis);
+                if (m_mapSelectable) check_value(measurement_type::map, m.map, yAxis);
+                check_value(measurement_type::pulse, m.pulse, yAxis2);
             }
             if (closest_in_radius) {
                 auto &[t, m, value, yAxis] = *closest_in_radius;
@@ -344,6 +468,7 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
 
         tag_visibility pressure_tag_visible{};
         tag_visibility pulse_tag_visible{};
+        std::optional<measurement_type> highlight{};
 
         const auto snapped_pos = std::visit(
             overloaded{
@@ -353,15 +478,17 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
                     m_state->under_cursor = std::nullopt;
                     return pos;
                 },
-                [&](const std::tuple<data_type, measurement, double, QCPAxis *> &p) {
+                [&](const std::tuple<measurement_type, measurement, double, QCPAxis *> &p) {
                     const auto &[type, m, value, yAxis] = p;
                     cursor_tracer->position->setType(QCPItemPosition::ptPlotCoords);
                     cursor_tracer->position->setAxes(xAxis, yAxis);
                     cursor_tracer->position->setCoords(m.key, value);
                     m_state->under_cursor = m;
+                    highlight = type;
                     pressure_tag_visible =
-                        type != data_type::pulse ? tag_visibility::visible : tag_visibility::invisible;
-                    pulse_tag_visible = type == data_type::pulse ? tag_visibility::visible : tag_visibility::invisible;
+                        type != measurement_type::pulse ? tag_visibility::visible : tag_visibility::invisible;
+                    pulse_tag_visible =
+                        type == measurement_type::pulse ? tag_visibility::visible : tag_visibility::invisible;
                     return QPointF{xAxis->coordToPixel(m.key), yAxis->coordToPixel(value)};
                 },
                 [&](const measurement &m) {
@@ -392,11 +519,26 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
                 || pulse_tag_visible == tag_visibility::automatic && bpm <= 125)
         );
         pulse_tag->setText(QString::number(bpm, 'g', 3));
+        if (m_state->under_cursor) {
+            measurement_preview->setVisible(true);
+            measurement_preview->setMeasurement(*m_state->under_cursor);
+            measurement_preview->setHighlight(highlight);
+            if (snapped_pos.x() > axisRect()->right() - 185) {
+                measurement_preview->position->setCoords(-10, 0);
+                measurement_preview->setPositionAlignment(Qt::AlignRight | Qt::AlignVCenter);
+            } else if (snapped_pos.x() < axisRect()->right() - 190) {
+                measurement_preview->position->setCoords(10, 0);
+                measurement_preview->setPositionAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+            }
+        } else {
+            measurement_preview->setVisible(false);
+        }
 
         replot(rpQueuedReplot);
     });
 
     connect(this, &BloodPressureGraph::mouseLeave, [this, selection_line, value_line, pressure_tag, pulse_tag] {
+        m_state->click_started = false;
         selection_line->setVisible(false);
         value_line->setVisible(false);
         pressure_tag->setVisible(false);
@@ -406,6 +548,13 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
 
     connect(this, &QCustomPlot::mouseRelease, [this, cursor_tracer](QMouseEvent *event) {
         if (m_state->click_started) {
+            m_state->click_started = false;
+            const auto elapsed = std::chrono::high_resolution_clock::now() - m_state->click_start_time;
+            static const auto start_drag_time = std::chrono::milliseconds(QApplication::startDragTime());
+            if (elapsed >= std::chrono::milliseconds(start_drag_time)) {
+                return;
+            }
+
             emit mouseClick(event, m_state->click_start);
             const auto debug = qDebug() << "Clicked at" << cursor_tracer->position->pixelPosition();
             if (m_state->under_cursor_at_click_start) {
