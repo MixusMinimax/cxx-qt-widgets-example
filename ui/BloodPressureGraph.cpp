@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <optional>
 #include <span>
+#include <utility>
 #include <vector>
 
 namespace
@@ -20,20 +21,7 @@ namespace
     {
         using Ts::operator()...;
     };
-}
 
-struct BloodPressureGraph::InternalState
-{
-    bool click_started = false;
-    QPointF click_start;
-
-    std::optional<const QCPGraphData *> under_cursor;
-    std::optional<const QCPGraphData *> under_cursor_at_click_start;
-};
-
-BloodPressureGraph::BloodPressureGraph(QWidget *parent)
-    : QCustomPlot{parent}, m_model{nullptr}, m_state{std::make_unique<InternalState>()}
-{
     struct measurement
     {
         QDateTime date_time;
@@ -43,6 +31,38 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
         double pulse{0};
         double key{0};
     };
+} // namespace
+
+static QDebug operator<<(QDebug d, const measurement &m)
+{
+    return d.nospace()
+        << "{date_time: "
+        << m.date_time
+        << ", systolic: "
+        << m.systolic
+        << ", diastolic: "
+        << m.diastolic
+        << ", map: "
+        << m.map
+        << ", pulse: "
+        << m.pulse
+        << ", key: "
+        << m.key
+        << '}';
+}
+
+struct BloodPressureGraph::InternalState
+{
+    bool click_started = false;
+    QPointF click_start;
+
+    std::optional<measurement> under_cursor;
+    std::optional<measurement> under_cursor_at_click_start;
+};
+
+BloodPressureGraph::BloodPressureGraph(QWidget *parent)
+    : QCustomPlot{parent}, m_model{nullptr}, m_state{std::make_unique<InternalState>()}
+{
     std::vector measurements{
         measurement{
             .date_time = QDateTime{QDate{2026, 8, 15}, QTime{17, 42}}, .systolic = 135, .diastolic = 84, .pulse = 66
@@ -168,31 +188,63 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
     yAxis->setRange(0, 200);
     yAxis2->setRange(20, 300);
 
-    // selection line
+    // selection highlight
+    // the default tracer can't have different
+    const auto cursor_tracer = new QCPItemTracer{this};
+    cursor_tracer->setVisible(false);
+    cursor_tracer->position->setType(QCPItemPosition::ptAbsolute);
+
     const auto selection_line = new QCPItemStraightLine{this};
-    selection_line->point1->setType(QCPItemPosition::ptAbsolute);
+    selection_line->point1->setParentAnchorX(cursor_tracer->position);
+    selection_line->point1->setTypeX(QCPItemPosition::ptAbsolute);
+    selection_line->point1->setTypeY(QCPItemPosition::ptAxisRectRatio);
+    selection_line->point1->setCoords(0, 0);
+    selection_line->point2->setParentAnchorX(cursor_tracer->position);
+    selection_line->point2->setTypeY(QCPItemPosition::ptAxisRectRatio);
     selection_line->point2->setType(QCPItemPosition::ptAbsolute);
+    selection_line->point2->setCoords(0, 1);
     selection_line->setPen(QPen{Qt::darkBlue});
     selection_line->setLayer("grid");
     selection_line->setVisible(false);
     selection_line->setAntialiased(false);
 
     const auto value_line = new QCPItemStraightLine{this};
-    value_line->point1->setType(QCPItemPosition::ptAbsolute);
-    value_line->point2->setType(QCPItemPosition::ptAbsolute);
+    value_line->point1->setParentAnchorY(cursor_tracer->position);
+    value_line->point1->setTypeX(QCPItemPosition::ptAxisRectRatio);
+    value_line->point1->setTypeY(QCPItemPosition::ptAbsolute);
+    value_line->point1->setCoords(0, 0);
+    value_line->point2->setParentAnchorY(cursor_tracer->position);
+    value_line->point2->setTypeX(QCPItemPosition::ptAxisRectRatio);
+    value_line->point2->setTypeY(QCPItemPosition::ptAbsolute);
+    value_line->point2->setCoords(1, 0);
     value_line->setPen(QPen{Qt::darkBlue, 1, Qt::DashLine});
     value_line->setLayer("grid");
     value_line->setVisible(false);
     value_line->setAntialiased(false);
 
+    // tag on the left side showing mmHg, follows the cursor
     const auto pressure_tag = new QCPAxisTag{yAxis};
-    const auto pulse_tag = new QCPAxisTag{yAxis2};
     pressure_tag->setPen(QPen{pressure_color});
     pressure_tag->setBrush(QBrush{pressure_color_light});
     pressure_tag->setVisible(false);
+    // instead of setting the value, we will just attach it to the cursor here
+    pressure_tag->position()->setParentAnchorY(cursor_tracer->position);
+    pressure_tag->position()->setTypeY(QCPItemPosition::ptAbsolute);
+    pressure_tag->setValue(0);
+
+    // tag on the right side showing min^-1, follows the cursor
+    const auto pulse_tag = new QCPAxisTag{yAxis2};
     pulse_tag->setPen(QPen{pulse_color});
     pulse_tag->setBrush(QBrush{pulse_color_light});
     pulse_tag->setVisible(false);
+    // instead of setting the value, we will just attach it to the cursor here
+    pulse_tag->position()->setParentAnchorY(cursor_tracer->position);
+    pulse_tag->position()->setTypeY(QCPItemPosition::ptAbsolute);
+    pulse_tag->setValue(0);
+
+    const auto measurement_preview = new QCPItemRect{this};
+    measurement_preview->setPen(QPen{Qt::black});
+    measurement_preview->setBrush(QBrush{Qt::white});
 
     // effects
     if (QTimeZone::systemTimeZone().hasDaylightTime()) {
@@ -239,7 +291,7 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
 
         // use binary search to find the start of the relevant range. Then we search for the closest point in the
         // radius. If there is none, the closest horizontal x-coordinate is used. Otherwise, nothing is found.
-        const auto find_closest_2d_b =
+        const auto find_closest =
             [this, &measurements](
                 const QPointF mouse_pos, const double radius_hor_px, const double radius_px, const bool clip_radius
             ) -> std::variant<std::monostate, std::tuple<data_type, measurement, double, QCPAxis *>, measurement> {
@@ -296,46 +348,32 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
         const auto snapped_pos = std::visit(
             overloaded{
                 [&](std::monostate) {
-                    selection_line->point1->setTypeX(QCPItemPosition::ptAbsolute);
-                    selection_line->point1->setCoords(pos.x(), 0);
-                    selection_line->point2->setTypeX(QCPItemPosition::ptAbsolute);
-                    selection_line->point2->setCoords(pos.x(), 10);
-                    value_line->point1->setTypeY(QCPItemPosition::ptAbsolute);
-                    value_line->point1->setCoords(0, pos.y());
-                    value_line->point2->setTypeY(QCPItemPosition::ptAbsolute);
-                    value_line->point2->setCoords(10, pos.y());
+                    cursor_tracer->position->setType(QCPItemPosition::ptAbsolute);
+                    cursor_tracer->position->setCoords(pos.x(), pos.y());
+                    m_state->under_cursor = std::nullopt;
                     return pos;
                 },
                 [&](const std::tuple<data_type, measurement, double, QCPAxis *> &p) {
                     const auto &[type, m, value, yAxis] = p;
-                    selection_line->point1->setTypeX(QCPItemPosition::ptPlotCoords);
-                    selection_line->point1->setCoords(m.key, 0);
-                    selection_line->point2->setTypeX(QCPItemPosition::ptPlotCoords);
-                    selection_line->point2->setCoords(m.key, 10);
-                    value_line->point1->setTypeY(QCPItemPosition::ptPlotCoords);
-                    value_line->point1->setAxes(xAxis, yAxis);
-                    value_line->point1->setCoords(0, value);
-                    value_line->point2->setTypeY(QCPItemPosition::ptPlotCoords);
-                    value_line->point2->setAxes(xAxis, yAxis);
-                    value_line->point2->setCoords(10, value);
+                    cursor_tracer->position->setType(QCPItemPosition::ptPlotCoords);
+                    cursor_tracer->position->setAxes(xAxis, yAxis);
+                    cursor_tracer->position->setCoords(m.key, value);
+                    m_state->under_cursor = m;
                     pressure_tag_visible =
                         type != data_type::pulse ? tag_visibility::visible : tag_visibility::invisible;
                     pulse_tag_visible = type == data_type::pulse ? tag_visibility::visible : tag_visibility::invisible;
                     return QPointF{xAxis->coordToPixel(m.key), yAxis->coordToPixel(value)};
                 },
                 [&](const measurement &m) {
-                    selection_line->point1->setTypeX(QCPItemPosition::ptPlotCoords);
-                    selection_line->point1->setCoords(m.key, 0);
-                    selection_line->point2->setTypeX(QCPItemPosition::ptPlotCoords);
-                    selection_line->point2->setCoords(m.key, 10);
-                    value_line->point1->setTypeY(QCPItemPosition::ptAbsolute);
-                    value_line->point1->setCoords(0, pos.y());
-                    value_line->point2->setTypeY(QCPItemPosition::ptAbsolute);
-                    value_line->point2->setCoords(10, pos.y());
+                    cursor_tracer->position->setTypeX(QCPItemPosition::ptPlotCoords);
+                    cursor_tracer->position->setTypeY(QCPItemPosition::ptAbsolute);
+                    cursor_tracer->position->setAxes(xAxis, yAxis);
+                    cursor_tracer->position->setCoords(m.key, pos.y());
+                    m_state->under_cursor = m;
                     return QPointF{xAxis->coordToPixel(m.key), pos.y()};
                 }
             },
-            find_closest_2d_b(e->pos(), 10, 20, true)
+            find_closest(e->pos(), 10, 20, true)
         );
         selection_line->setVisible(true);
         value_line->setVisible(true);
@@ -345,7 +383,6 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
             && (pressure_tag_visible == tag_visibility::visible
                 || pressure_tag_visible == tag_visibility::automatic && mmHg >= 55)
         );
-        pressure_tag->setValue(mmHg);
         pressure_tag->setText(QString::number(mmHg, 'g', 3));
 
         const auto bpm = yAxis2->pixelToCoord(snapped_pos.y());
@@ -354,7 +391,6 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
             && (pulse_tag_visible == tag_visibility::visible
                 || pulse_tag_visible == tag_visibility::automatic && bpm <= 125)
         );
-        pulse_tag->setValue(bpm);
         pulse_tag->setText(QString::number(bpm, 'g', 3));
 
         replot(rpQueuedReplot);
@@ -368,12 +404,12 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
         replot(rpQueuedReplot);
     });
 
-    connect(this, &QCustomPlot::mouseRelease, [this](QMouseEvent *event) {
+    connect(this, &QCustomPlot::mouseRelease, [this, cursor_tracer](QMouseEvent *event) {
         if (m_state->click_started) {
             emit mouseClick(event, m_state->click_start);
-            auto debug = qDebug() << "Clicked at" << m_state->click_start;
+            const auto debug = qDebug() << "Clicked at" << cursor_tracer->position->pixelPosition();
             if (m_state->under_cursor_at_click_start) {
-                debug << (*m_state->under_cursor_at_click_start)->value;
+                debug << *m_state->under_cursor_at_click_start;
             }
         }
     });
