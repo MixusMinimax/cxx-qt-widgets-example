@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <optional>
+#include <random>
 #include <span>
 #include <utility>
 #include <vector>
@@ -217,12 +218,21 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
         measurement{
             .date_time = QDateTime{QDate{2026, 9, 3}, QTime{17, 32}}, .systolic = 130, .diastolic = 83, .pulse = 61
         },
+        measurement{
+            .date_time = QDateTime{QDate{2026, 9, 5}, QTime{16, 7}}, .systolic = 132, .diastolic = 89, .pulse = 65
+        },
+        measurement{
+            .date_time = QDateTime{QDate{2026, 9, 7}, QTime{14, 7}}, .systolic = 143, .diastolic = 84, .pulse = 53
+        },
     };
+    // purposefully deterministic, for repeatability of tests.
+    std::mt19937 rng{123456789}; // NOLINT(*-msc51-cpp)
     for (auto &m: measurements) {
+        std::ranges::for_each(m.id, [&rng](std::uint32_t &n) { n = rng(); });
+        m.key = QCPAxisTickerDateTime::dateTimeToKey(m.date_time);
         // Mean Arterial Pressure = 1/3*(SBP) + 2/3*(DBP)
         // DOI: 10.1097/CCM.0000000000000324
         m.map = 1.0 / 3 * m.systolic + 2.0 / 3 * m.diastolic;
-        m.key = QCPAxisTickerDateTime::dateTimeToKey(m.date_time);
     }
 
     const auto g_systolic = addGraph(xAxis, yAxis);
@@ -232,7 +242,7 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
     const auto g_pulse = addGraph(xAxis, yAxis2);
 
     // add data
-    for (auto &&[date_time, systolic, diastolic, map, pulse, key]: measurements) {
+    for (auto &&[id, date_time, systolic, diastolic, map, pulse, key]: measurements) {
         g_systolic->data()->add(QCPGraphData{key, systolic});
         g_diastolic->data()->add(QCPGraphData{key, diastolic});
         g_map->data()->add(QCPGraphData{key, map});
@@ -551,11 +561,8 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
             m_state->click_started = false;
             const auto elapsed = std::chrono::high_resolution_clock::now() - m_state->click_start_time;
             static const auto start_drag_time = std::chrono::milliseconds(QApplication::startDragTime());
-            if (elapsed >= std::chrono::milliseconds(start_drag_time)) {
-                return;
-            }
+            if (elapsed >= std::chrono::milliseconds(start_drag_time)) return;
 
-            emit mouseClick(event, m_state->click_start);
             const auto debug = qDebug() << "Clicked at" << cursor_tracer->position->pixelPosition();
             if (m_state->under_cursor_at_click_start) {
                 debug << *m_state->under_cursor_at_click_start;

@@ -49,6 +49,10 @@ qt_add_executable(myapp
         ui/MainWindow.ui
         ui/BloodPressureGraph.cpp
         ui/BloodPressureGraph.h
+        ui/MeasurementModal.cpp
+        ui/MeasurementModal.h
+        ui/MeasurementModal.ui
+
         ui/MyModel.cpp
         ui/MyModel.h
 )
