@@ -1,6 +1,7 @@
 #include "BloodPressureGraph.h"
 
 #include "MyModel.h"
+#include "overloaded.h"
 
 #include <QBrush>
 #include <QColor>
@@ -18,31 +19,8 @@
 namespace
 {
     using namespace measurements;
-
-    template<class... Ts>
-    struct overloaded : Ts...
-    {
-        using Ts::operator()...;
-    };
 } // namespace
 
-QDebug measurements::operator<<(QDebug d, const measurement &m)
-{
-    return d.nospace()
-        << "{date_time: "
-        << m.date_time
-        << ", systolic: "
-        << m.systolic
-        << ", diastolic: "
-        << m.diastolic
-        << ", map: "
-        << m.map
-        << ", pulse: "
-        << m.pulse
-        << ", key: "
-        << m.key
-        << '}';
-}
 
 QCPMeasurementPreview::QCPMeasurementPreview(QCustomPlot *parentPlot)
     : QCPItemText{parentPlot}, m_dateTimeFormat{"hh:mm:ss\ndd.MM.yy"}
@@ -170,7 +148,8 @@ void QCPMeasurementPreview::draw(QCPPainter *painter)
 
 struct BloodPressureGraph::InternalState
 {
-    bool click_started = false;
+    bool click_started{false};
+    bool is_double_click{false};
     QPointF click_start;
     std::chrono::high_resolution_clock::time_point click_start_time;
 
@@ -403,25 +382,7 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
         connect(xAxis, qOverload<const QCPRange &>(&QCPAxis::rangeChanged), std::move(adjust_ticker_for_daylight_time));
     }
 
-    connect(this, &QCustomPlot::mousePress, [this](const QMouseEvent *e) {
-        m_state->click_started = true;
-        m_state->click_start_time = std::chrono::high_resolution_clock::now();
-        m_state->click_start = e->position();
-        m_state->under_cursor_at_click_start = m_state->under_cursor;
-    });
-
-    static const int MIN_DRAG_DISTANCE = QApplication::startDragDistance();
-
-    connect(this, &QCustomPlot::mouseMove, [=, this](const QMouseEvent *e) {
-        const auto pos = e->position();
-
-        // cancel click if we move too far
-        if (m_state->click_started) {
-            const auto vec = pos - m_state->click_start;
-            const auto sq_len = vec.x() * vec.x() + vec.y() * vec.y();
-            if (sq_len > MIN_DRAG_DISTANCE * MIN_DRAG_DISTANCE) m_state->click_started = false;
-        }
-
+    const auto move_cursor = [=, this](const QPointF pos) {
         // use binary search to find the start of the relevant range. Then we search for the closest point in the
         // radius. If there is none, the closest horizontal x-coordinate is used. Otherwise, nothing is found.
         const auto find_closest =
@@ -510,7 +471,7 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
                     return QPointF{xAxis->coordToPixel(m.key), pos.y()};
                 }
             },
-            find_closest(e->pos(), 10, 20, true)
+            find_closest(pos, 10, 20, true)
         );
         selection_line->setVisible(true);
         value_line->setVisible(true);
@@ -543,6 +504,37 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
         } else {
             measurement_preview->setVisible(false);
         }
+    };
+
+    connect(this, &QCustomPlot::mousePress, [this](const QMouseEvent *e) {
+        m_state->click_started = true;
+        m_state->is_double_click = false;
+        m_state->click_start_time = std::chrono::high_resolution_clock::now();
+        m_state->click_start = e->position();
+        m_state->under_cursor_at_click_start = m_state->under_cursor;
+    });
+
+    connect(this, &QCustomPlot::mouseDoubleClick, [this](const QMouseEvent *e) {
+        m_state->click_started = true;
+        m_state->is_double_click = true;
+        m_state->click_start_time = std::chrono::high_resolution_clock::now();
+        m_state->click_start = e->position();
+        m_state->under_cursor_at_click_start = m_state->under_cursor;
+    });
+
+    connect(this, &QCustomPlot::mouseMove, [=, this](const QMouseEvent *e) {
+        const auto pos = e->position();
+
+        static const int MIN_DRAG_DISTANCE = QApplication::startDragDistance();
+
+        // cancel click if we move too far
+        if (m_state->click_started) {
+            const auto vec = pos - m_state->click_start;
+            const auto sq_len = vec.x() * vec.x() + vec.y() * vec.y();
+            if (sq_len > MIN_DRAG_DISTANCE * MIN_DRAG_DISTANCE) m_state->click_started = false;
+        }
+
+        move_cursor(pos);
 
         replot(rpQueuedReplot);
     });
@@ -556,19 +548,35 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
         replot(rpQueuedReplot);
     });
 
-    connect(this, &QCustomPlot::mouseRelease, [this, cursor_tracer](QMouseEvent *event) {
+    connect(this, &QCustomPlot::mouseRelease, [this, cursor_tracer] {
+        static const auto start_drag_time = std::chrono::milliseconds(QApplication::startDragTime());
+
         if (m_state->click_started) {
             m_state->click_started = false;
             const auto elapsed = std::chrono::high_resolution_clock::now() - m_state->click_start_time;
-            static const auto start_drag_time = std::chrono::milliseconds(QApplication::startDragTime());
             if (elapsed >= std::chrono::milliseconds(start_drag_time)) return;
 
-            const auto debug = qDebug() << "Clicked at" << cursor_tracer->position->pixelPosition();
+            auto debug = qDebug() << "Clicked at" << cursor_tracer->position->pixelPosition();
+            if (m_state->is_double_click) {
+                debug = debug << "double click";
+                if (axisRect()->rect().contains(m_state->click_start.toPoint())) {
+                    if (const auto &measurement = m_state->under_cursor) {
+                        emit measurementEditStarted(*measurement);
+                    } else {
+                        emit measurementCreateStarted(
+                            QCPAxisTickerDateTime::keyToDateTime(xAxis->pixelToCoord(m_state->click_start.x()))
+                        );
+                    }
+                }
+            }
             if (m_state->under_cursor_at_click_start) {
-                debug << *m_state->under_cursor_at_click_start;
+                debug = debug << *m_state->under_cursor_at_click_start;
             }
         }
     });
+
+    // connect(this, &QCustomPlot::mouseDoubleClick, [this, move_cursor](const QMouseEvent *e) { move_cursor(e->pos());
+    // });
 
     replot();
 }

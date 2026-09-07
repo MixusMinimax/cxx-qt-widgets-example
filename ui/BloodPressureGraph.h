@@ -1,6 +1,8 @@
 #ifndef MYAPP_BLOODPRESSUREGRAPH_H
 #define MYAPP_BLOODPRESSUREGRAPH_H
 
+#include "MyModel.h"
+
 #include <QCustomPlot>
 #include <QWidget>
 
@@ -11,29 +13,6 @@ class MyModel;
 
 namespace measurements
 {
-    enum struct measurement_type
-    {
-        systolic,
-        diastolic,
-        map,
-        pulse
-    };
-
-    struct measurement
-    {
-        std::array<std::uint32_t, 4> id;
-        QDateTime date_time;
-        double systolic{0};
-        double diastolic{0};
-        double map{0};
-        double pulse{0};
-        double key{0};
-
-        auto operator<=>(const measurement &measurement) const = default;
-
-        friend QDebug operator<<(QDebug d, const measurement &m);
-    };
-
     class QCPMeasurementPreview : public QCPItemText
     {
         Q_OBJECT
@@ -98,7 +77,7 @@ public:
 signals:
     void mouseLeave(QEvent *event);
     void measurementEditStarted(measurements::measurement m);
-    void measurementCreateStarted(double key);
+    void measurementCreateStarted(QDateTime date_time);
 
 private slots:
     void onSpeedChanged(int speed);

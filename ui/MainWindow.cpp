@@ -11,7 +11,10 @@
 #include "MyModel.h"
 
 MainWindow::MainWindow(rust::Box<backend::AsyncControllerHandle> tokio_handle, QWidget *parent)
-    : QMainWindow{parent}, m_backend{new backend::Backend{this}}, m_ui{std::make_unique<Ui::MainWindow>()}
+    : QMainWindow{parent},
+      m_backend{new backend::Backend{this}},
+      m_measurementModal{new MeasurementModal{this}},
+      m_ui{std::make_unique<Ui::MainWindow>()}
 {
     m_backend->initialize(std::move(tokio_handle));
     m_ui->setupUi(this);
@@ -32,6 +35,7 @@ MainWindow::MainWindow(rust::Box<backend::AsyncControllerHandle> tokio_handle, Q
     connect(m_ui->actionSaveAs, &QAction::triggered, this, &MainWindow::save_as);
     connect(m_ui->actionQuit, &QAction::triggered, this, &MainWindow::quit);
     connect(m_ui->actionAbout, &QAction::triggered, this, &MainWindow::about);
+    connect(m_ui->actionAbout, &QAction::triggered, this, &MainWindow::about);
 
     connect(m_ui->pushButton, &QPushButton::pressed, [this] {
         statusBar()->showMessage(m_backend->make_message(tr("button")));
@@ -39,6 +43,18 @@ MainWindow::MainWindow(rust::Box<backend::AsyncControllerHandle> tokio_handle, Q
 
     connect(m_backend, &backend::Backend::message_received, [this](const QString &msg) {
         statusBar()->showMessage(msg);
+    });
+
+    connect(m_ui->graphOutput, &BloodPressureGraph::measurementEditStarted, [this](measurements::measurement m) {
+        m_measurementModal->initialize(std::move(m));
+        m_measurementModal->setModal(true);
+        m_measurementModal->show();
+    });
+
+    connect(m_ui->graphOutput, &BloodPressureGraph::measurementCreateStarted, [this](QDateTime date_time) {
+        m_measurementModal->initialize(std::move(date_time));
+        m_measurementModal->setModal(true);
+        m_measurementModal->show();
     });
 }
 

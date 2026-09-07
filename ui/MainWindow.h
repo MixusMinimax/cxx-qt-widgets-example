@@ -1,6 +1,8 @@
 #ifndef MYAPP_MAINWINDOW_H
 #define MYAPP_MAINWINDOW_H
 
+#include "MeasurementModal.h"
+
 #include <QMainWindow>
 #include <backend/src/backend.cxxqt.h>
 #include <backend/src/controller.cxx.h>
@@ -11,13 +13,15 @@
 class MyModel;
 
 QT_BEGIN_NAMESPACE
-namespace Ui {
+namespace Ui
+{
     class MainWindow;
 }
 
 QT_END_NAMESPACE
 
-class MainWindow : public QMainWindow {
+class MainWindow : public QMainWindow
+{
     Q_OBJECT
 
 public:
@@ -43,6 +47,7 @@ private slots:
 private:
     backend::Backend *m_backend = nullptr;
     MyModel *m_model = nullptr;
+    MeasurementModal *m_measurementModal;
     std::array<QMetaObject::Connection, 1> m_modelConnections;
     std::unique_ptr<Ui::MainWindow> m_ui;
 };

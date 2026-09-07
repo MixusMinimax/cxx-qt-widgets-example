@@ -23,7 +23,7 @@
     </rect>
    </property>
    <property name="standardButtons">
-    <set>QDialogButtonBox::StandardButton::Cancel|QDialogButtonBox::StandardButton::Ok</set>
+    <set>QDialogButtonBox::StandardButton::Cancel|QDialogButtonBox::StandardButton::Save</set>
    </property>
   </widget>
   <widget class="QWidget" name="formLayoutWidget">
@@ -41,15 +41,8 @@
       <property name="text">
        <string>Systolic</string>
       </property>
-     </widget>
-    </item>
-    <item row="1" column="1">
-     <widget class="QSpinBox" name="systolicEdit">
-      <property name="sizePolicy">
-       <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
-        <horstretch>0</horstretch>
-        <verstretch>0</verstretch>
-       </sizepolicy>
+      <property name="buddy">
+       <cstring>systolicEdit</cstring>
       </property>
      </widget>
     </item>
@@ -57,6 +50,9 @@
      <widget class="QLabel" name="diastolicLabel">
       <property name="text">
        <string>Diastolic</string>
+      </property>
+      <property name="buddy">
+       <cstring>diastolicEdit</cstring>
       </property>
      </widget>
     </item>
@@ -68,12 +64,24 @@
         <verstretch>0</verstretch>
        </sizepolicy>
       </property>
+      <property name="suffix">
+       <string> mmHg</string>
+      </property>
+      <property name="minimum">
+       <number>50</number>
+      </property>
+      <property name="maximum">
+       <number>140</number>
+      </property>
      </widget>
     </item>
     <item row="3" column="0">
      <widget class="QLabel" name="mapLabel">
       <property name="text">
        <string>MAP</string>
+      </property>
+      <property name="buddy">
+       <cstring>mapEdit</cstring>
       </property>
      </widget>
     </item>
@@ -85,12 +93,24 @@
         <verstretch>0</verstretch>
        </sizepolicy>
       </property>
+      <property name="suffix">
+       <string> mmHg</string>
+      </property>
+      <property name="minimum">
+       <number>50</number>
+      </property>
+      <property name="maximum">
+       <number>200</number>
+      </property>
      </widget>
     </item>
     <item row="4" column="0">
      <widget class="QLabel" name="pulseLabel">
       <property name="text">
        <string>Pulse</string>
+      </property>
+      <property name="buddy">
+       <cstring>pulseEdit</cstring>
       </property>
      </widget>
     </item>
@@ -102,12 +122,24 @@
         <verstretch>0</verstretch>
        </sizepolicy>
       </property>
+      <property name="suffix">
+       <string> / min</string>
+      </property>
+      <property name="minimum">
+       <number>30</number>
+      </property>
+      <property name="maximum">
+       <number>130</number>
+      </property>
      </widget>
     </item>
     <item row="5" column="0">
      <widget class="QLabel" name="dateTimeLabel">
       <property name="text">
        <string>Date/Time</string>
+      </property>
+      <property name="buddy">
+       <cstring>dateTimeEdit</cstring>
       </property>
      </widget>
     </item>
@@ -126,6 +158,9 @@
       <property name="text">
        <string>Internal ID</string>
       </property>
+      <property name="buddy">
+       <cstring>internalIDEdit</cstring>
+      </property>
      </widget>
     </item>
     <item row="0" column="1">
@@ -133,14 +168,44 @@
       <property name="enabled">
        <bool>true</bool>
       </property>
+      <property name="focusPolicy">
+       <enum>Qt::FocusPolicy::ClickFocus</enum>
+      </property>
       <property name="readOnly">
        <bool>true</bool>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="1">
+     <widget class="QSpinBox" name="systolicEdit">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="suffix">
+       <string> mmHg</string>
+      </property>
+      <property name="minimum">
+       <number>80</number>
+      </property>
+      <property name="maximum">
+       <number>200</number>
       </property>
      </widget>
     </item>
    </layout>
   </widget>
  </widget>
+ <tabstops>
+  <tabstop>internalIDEdit</tabstop>
+  <tabstop>systolicEdit</tabstop>
+  <tabstop>diastolicEdit</tabstop>
+  <tabstop>mapEdit</tabstop>
+  <tabstop>pulseEdit</tabstop>
+  <tabstop>dateTimeEdit</tabstop>
+ </tabstops>
  <resources/>
  <connections/>
 </ui>
