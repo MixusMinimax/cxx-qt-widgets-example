@@ -61,6 +61,13 @@ MacroBlockEnd: ''
 MaxEmptyLinesToKeep: 2
 NamespaceIndentation: All
 PointerAlignment: Right
+QualifierAlignment: Custom
+QualifierOrder:
+  - inline
+  - static
+  - const
+  - volatile
+  - type
 ReflowComments: Always
 ShortNamespaceLines: 12
 SpaceAfterCStyleCast: true

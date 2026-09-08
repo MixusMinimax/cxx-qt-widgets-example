@@ -522,7 +522,7 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
         m_state->under_cursor_at_click_start = m_state->under_cursor;
     });
 
-    connect(this, &QCustomPlot::mouseMove, [=, this](const QMouseEvent *e) {
+    connect(this, &QCustomPlot::mouseMove, [this, move_cursor](const QMouseEvent *e) {
         const auto pos = e->position();
 
         static const int MIN_DRAG_DISTANCE = QApplication::startDragDistance();
@@ -549,12 +549,12 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
     });
 
     connect(this, &QCustomPlot::mouseRelease, [this, cursor_tracer] {
-        static const auto start_drag_time = std::chrono::milliseconds(QApplication::startDragTime());
+        static const std::chrono::milliseconds start_drag_time{QApplication::startDragTime()};
 
         if (m_state->click_started) {
             m_state->click_started = false;
             const auto elapsed = std::chrono::high_resolution_clock::now() - m_state->click_start_time;
-            if (elapsed >= std::chrono::milliseconds(start_drag_time)) return;
+            if (elapsed >= start_drag_time) return;
 
             auto debug = qDebug() << "Clicked at" << cursor_tracer->position->pixelPosition();
             if (m_state->is_double_click) {
@@ -574,9 +574,6 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
             }
         }
     });
-
-    // connect(this, &QCustomPlot::mouseDoubleClick, [this, move_cursor](const QMouseEvent *e) { move_cursor(e->pos());
-    // });
 
     replot();
 }

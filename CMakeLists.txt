@@ -32,6 +32,8 @@ if (NOT CxxQt_FOUND)
     FetchContent_MakeAvailable(CxxQt)
 endif ()
 
+find_package(SQLite3)
+
 qt_standard_project_setup()
 
 add_subdirectory(vendor/qcustomplot)
@@ -41,6 +43,8 @@ cxx_qt_import_crate(
         CRATES backend
         QT_MODULES Qt6::Core
 )
+
+target_link_libraries(backend INTERFACE SQLite3::SQLite3)
 
 qt_add_executable(myapp
         ui/main.cpp
