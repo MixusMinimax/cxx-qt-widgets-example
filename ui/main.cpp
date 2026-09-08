@@ -25,10 +25,16 @@ int main(int argc, char *argv[])
         // On windows, QApplication::exec() is not guaranteed to return. It may exit instead.
         // We therefore need to fully wait for tokio to shut down.
         controller->shutdown();
+        // wait for blocking futures to finish:
+        void(rust::Box{std::move(controller)});
 #endif
     });
 
     const auto ret = QApplication::exec();
+#ifndef _WIN32
     controller->shutdown();
+    // wait for blocking futures to finish:
+    void(rust::Box{std::move(controller)});
+#endif
     return ret;
 }

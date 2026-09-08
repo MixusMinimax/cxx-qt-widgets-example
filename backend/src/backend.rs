@@ -93,8 +93,8 @@ impl ffi::MeasurementModel {
         let rust = self.rust().inner.get().unwrap();
         let qt_thread = self.qt_thread();
         let measurement_service: Arc<MeasurementService> = rust.measurement_service.clone();
-        rust.tokio_handle.spawn_cb(async move |cb| {
-            match measurement_service.load_measurements(cb).await {
+        rust.tokio_handle.spawn_cb(async move |ct| {
+            match measurement_service.load_measurements(ct).await {
                 Ok(v) => {
                     let v = v
                         .into_iter()

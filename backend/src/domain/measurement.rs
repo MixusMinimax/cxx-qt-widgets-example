@@ -7,6 +7,7 @@ use std::env;
 use tokio::task::spawn_blocking;
 use tokio_util::future::FutureExt;
 use tokio_util::sync::CancellationToken;
+use tokio_util::task::TaskTracker;
 
 #[derive(Queryable, Selectable, Insertable, Clone, Debug, Default)]
 #[diesel(table_name = crate::schema::measurements)]
@@ -38,6 +39,10 @@ impl MeasurementService {
     ) -> Result<Vec<Measurement>, MeasurementServiceError> {
         use crate::schema::measurements::dsl::*;
         use diesel::prelude::*;
+
+        // will run to completion either way, but we don't want to wait for completion here.
+        // On the graceful shutdown, we do want to wait so that we don't just abort the process.
+        // Dropping the runtime will wait for these blocking tasks to finish.
 
         let results = spawn_blocking(|| {
             let connection = &mut establish_connection();
