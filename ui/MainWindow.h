@@ -5,12 +5,14 @@
 
 #include <QMainWindow>
 #include <backend/src/backend.cxxqt.h>
-#include <backend/src/controller.cxx.h>
 
 #include <array>
 #include <memory>
 
-class MyModel;
+namespace backend
+{
+    class MeasurementModel;
+}
 
 QT_BEGIN_NAMESPACE
 namespace Ui
@@ -25,30 +27,24 @@ class MainWindow : public QMainWindow
     Q_OBJECT
 
 public:
-    explicit MainWindow(rust::Box<backend::AsyncControllerHandle> tokio_handle, QWidget *parent = nullptr);
+    explicit MainWindow(QWidget *parent = nullptr);
 
     ~MainWindow() override;
 
-    void setModel(MyModel *model);
+    void setModel(backend::MeasurementModel *model);
 
 private slots:
     void newProject() const;
-
     void open() const;
-
     void save() const;
-
     void save_as() const;
-
     void quit();
-
     void about() const;
 
 private:
-    backend::Backend *m_backend = nullptr;
-    MyModel *m_model = nullptr;
+    backend::MeasurementModel *m_model{nullptr};
     MeasurementModal *m_measurementModal;
-    std::array<QMetaObject::Connection, 1> m_modelConnections;
+    std::array<QMetaObject::Connection, 0> m_modelConnections{};
     std::unique_ptr<Ui::MainWindow> m_ui;
 };
 

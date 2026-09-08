@@ -1,0 +1,11 @@
+[package]
+name = "sql-uuid"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+diesel = { version = "2,<2.3.8", features = ["uuid"] }
+uuid = { version = "1" }
+
+[features]
+v4 = ["uuid/v4"]

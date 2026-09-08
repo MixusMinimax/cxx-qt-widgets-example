@@ -34,15 +34,15 @@ name = "backend"
 version = "0.1.0"
 dependencies = [
  "cxx",
- "cxx-build",
  "cxx-qt",
  "cxx-qt-build",
  "cxx-qt-lib",
  "diesel",
  "dotenvy",
+ "sql-uuid",
+ "thiserror 2.0.20",
  "tokio",
  "tokio-util",
- "uuid",
 ]
 
 [[package]]
@@ -782,6 +782,14 @@ name = "slab"
 version = "0.4.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c790de23124f9ab44544d7ac05d60440adc586479ce501c1d6d7da3cd8c9cf5"
+
+[[package]]
+name = "sql-uuid"
+version = "0.1.0"
+dependencies = [
+ "diesel",
+ "uuid",
+]
 
 [[package]]
 name = "sqlite-wasm-rs"

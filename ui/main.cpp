@@ -1,7 +1,7 @@
 #include "MainWindow.h"
-#include "MyModel.h"
 
 #include <QApplication>
+#include <backend/src/backend.cxxqt.h>
 #include <backend/src/controller.cxx.h>
 
 #include <memory>
@@ -12,9 +12,10 @@ int main(int argc, char *argv[])
 
     const QApplication app{argc, argv};
 
-    const auto model = std::make_unique<MyModel>();
+    const auto model = std::make_unique<backend::MeasurementModel>();
+    model->initialize(controller->handle());
 
-    MainWindow window{controller->handle()};
+    MainWindow window{};
     window.setModel(model.get());
     window.show();
 

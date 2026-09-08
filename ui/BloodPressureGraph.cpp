@@ -8,10 +8,12 @@
 #include <QDateTime>
 #include <QPen>
 #include <QSharedPointer>
+#include <backend/src/backend.cxxqt.h>
 
 #include <algorithm>
 #include <optional>
 #include <random>
+#include <ranges>
 #include <span>
 #include <utility>
 #include <vector>
@@ -580,8 +582,10 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
 
 BloodPressureGraph::~BloodPressureGraph() = default;
 
-void BloodPressureGraph::setModel(MyModel *model)
+void BloodPressureGraph::setModel(backend::MeasurementModel *model)
 {
+    static std::mt19937 rng{696969};
+
     if (model == m_model) return;
     if (m_model) {
         for (auto &&conn: m_modelConnections)
@@ -589,21 +593,27 @@ void BloodPressureGraph::setModel(MyModel *model)
     }
     m_model = model;
     if (m_model) {
-        m_modelConnections = {
-            connect(m_model, &MyModel::speedChanged, this, &BloodPressureGraph::onSpeedChanged),
-        };
-        onSpeedChanged(m_model->speed());
+        m_modelConnections = {connect(
+            m_model,
+            &backend::MeasurementModel::measurements_loaded,
+            [](const uint16_t req_id, const rust::Vec<backend::Measurement> &measurements) {
+                auto debug = qDebug().nospace() << "req id: " << req_id << ", measurements: [";
+                std::ranges::for_each(measurements, [&debug](const backend::Measurement &m) {
+                    debug = debug << "{s:" << m.systolic << ", d:" << m.diastolic << "},";
+                });
+                debug << "]";
+            }
+        )};
+        m_model->load_measurements(rng());
     } else {
         m_modelConnections = {};
     }
 }
 
-auto BloodPressureGraph::model() const -> MyModel * { return m_model; }
+auto BloodPressureGraph::model() const -> backend::MeasurementModel * { return m_model; }
 
 void BloodPressureGraph::setMapSelectable(const bool value) { m_mapSelectable = value; }
 
 bool BloodPressureGraph::mapSelectable() const { return m_mapSelectable; }
-
-void BloodPressureGraph::onSpeedChanged(const int speed) { qDebug() << "Speed: " << speed; }
 
 void BloodPressureGraph::leaveEvent(QEvent *event) { emit mouseLeave(event); }

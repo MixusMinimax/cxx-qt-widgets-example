@@ -9,7 +9,10 @@
 #include <array>
 #include <memory>
 
-class MyModel;
+namespace backend
+{
+    class MeasurementModel;
+}
 
 namespace measurements
 {
@@ -38,7 +41,7 @@ namespace measurements
 
         void draw(QCPPainter *painter) override;
 
-        measurement m_measurement;
+        measurement m_measurement{};
         std::array<std::pair<QString, QString>, 5> m_rows;
         std::array<QPen, 5> m_pens{Qt::NoPen, Qt::NoPen, Qt::NoPen, Qt::NoPen, Qt::NoPen};
         std::array<QPen, 5> m_highlightPens{Qt::NoPen, Qt::NoPen, Qt::NoPen, Qt::NoPen, Qt::NoPen};
@@ -66,10 +69,13 @@ public:
 
     ~BloodPressureGraph() override;
 
-    void setModel(MyModel *model);
+    void setModel(backend::MeasurementModel *model);
 
-    [[nodiscard]] MyModel *model() const;
+    [[nodiscard]] backend::MeasurementModel *model() const;
 
+    /*!
+     * Whether the mean arterial pressure (map) is selectable in the graph. If false, the cursor will not snap to it.
+     */
     void setMapSelectable(bool value);
 
     [[nodiscard]] bool mapSelectable() const;
@@ -79,15 +85,12 @@ signals:
     void measurementEditStarted(measurements::measurement m);
     void measurementCreateStarted(QDateTime date_time);
 
-private slots:
-    void onSpeedChanged(int speed);
-
 protected:
     void leaveEvent(QEvent *event) override;
 
 private:
     bool m_mapSelectable{true};
-    MyModel *m_model;
+    backend::MeasurementModel *m_model{nullptr};
     std::array<QMetaObject::Connection, 1> m_modelConnections;
 
     struct InternalState;

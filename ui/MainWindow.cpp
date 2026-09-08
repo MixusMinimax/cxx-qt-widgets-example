@@ -4,19 +4,15 @@
 #include "ui_MainWindow.h"
 
 #include <QDebug>
-#include <QPushButton>
 #include <QStatusBar>
 #include <QWidget>
+#include <backend/src/backend.cxxqt.h>
 
 #include "MyModel.h"
 
-MainWindow::MainWindow(rust::Box<backend::AsyncControllerHandle> tokio_handle, QWidget *parent)
-    : QMainWindow{parent},
-      m_backend{new backend::Backend{this}},
-      m_measurementModal{new MeasurementModal{this}},
-      m_ui{std::make_unique<Ui::MainWindow>()}
+MainWindow::MainWindow(QWidget *parent)
+    : QMainWindow{parent}, m_measurementModal{new MeasurementModal{this}}, m_ui{std::make_unique<Ui::MainWindow>()}
 {
-    m_backend->initialize(std::move(tokio_handle));
     m_ui->setupUi(this);
 
     statusBar()->showMessage(tr("Hello World!"));
@@ -37,14 +33,6 @@ MainWindow::MainWindow(rust::Box<backend::AsyncControllerHandle> tokio_handle, Q
     connect(m_ui->actionAbout, &QAction::triggered, this, &MainWindow::about);
     connect(m_ui->actionAbout, &QAction::triggered, this, &MainWindow::about);
 
-    connect(m_ui->pushButton, &QPushButton::pressed, [this] {
-        statusBar()->showMessage(m_backend->make_message(tr("button")));
-    });
-
-    connect(m_backend, &backend::Backend::message_received, [this](const QString &msg) {
-        statusBar()->showMessage(msg);
-    });
-
     connect(m_ui->graphOutput, &BloodPressureGraph::measurementEditStarted, [this](measurements::measurement m) {
         m_measurementModal->initialize(std::move(m));
         m_measurementModal->setModal(true);
@@ -60,7 +48,7 @@ MainWindow::MainWindow(rust::Box<backend::AsyncControllerHandle> tokio_handle, Q
 
 MainWindow::~MainWindow() = default;
 
-void MainWindow::setModel(MyModel *model)
+void MainWindow::setModel(backend::MeasurementModel *model)
 {
     if (m_model == model) return;
     if (m_model) {
@@ -70,8 +58,10 @@ void MainWindow::setModel(MyModel *model)
     m_model = model;
     if (m_model) {
         m_modelConnections = {
-            connect(m_ui->pushButton, &QPushButton::pressed, m_model, &MyModel::incrementSpeed),
+            // todo
         };
+    } else {
+        m_modelConnections = {};
     }
     m_ui->graphOutput->setModel(model);
 }
