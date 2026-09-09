@@ -8,8 +8,6 @@
 #include <QWidget>
 #include <backend/src/backend.cxxqt.h>
 
-#include "MyModel.h"
-
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow{parent}, m_measurementModal{new MeasurementModal{this}}, m_ui{std::make_unique<Ui::MainWindow>()}
 {
@@ -48,7 +46,7 @@ MainWindow::MainWindow(QWidget *parent)
 
 MainWindow::~MainWindow() = default;
 
-void MainWindow::setModel(backend::MeasurementModel *model)
+void MainWindow::setModel(measurements::MeasurementModel *model)
 {
     if (m_model == model) return;
     if (m_model) {

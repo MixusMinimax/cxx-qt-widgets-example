@@ -1,4 +1,3 @@
-use crate::schema::measurements::dsl::measurements;
 use diesel::internal::derives::multiconnection::chrono::NaiveDateTime;
 use diesel::{Connection, Insertable, Queryable, Selectable, SqliteConnection};
 use dotenvy::dotenv;
@@ -7,7 +6,6 @@ use std::env;
 use tokio::task::spawn_blocking;
 use tokio_util::future::FutureExt;
 use tokio_util::sync::CancellationToken;
-use tokio_util::task::TaskTracker;
 
 #[derive(Queryable, Selectable, Insertable, Clone, Debug, Default)]
 #[diesel(table_name = crate::schema::measurements)]
@@ -49,6 +47,7 @@ impl MeasurementService {
             connection.transaction(|connection| {
                 measurements
                     .select(Measurement::as_select())
+                    .order_by(date_time.asc()) // assuming formatted as iso
                     .load(connection)
             })
         })
@@ -72,9 +71,10 @@ fn establish_connection() -> SqliteConnection {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use diesel::debug_query;
+    use diesel::internal::derives::multiconnection::chrono::{NaiveDate, NaiveTime};
     use diesel::prelude::*;
-    use dotenvy::dotenv;
-    use std::env;
+    use diesel::sqlite::Sqlite;
 
     #[test]
     fn test_query() {
@@ -82,14 +82,19 @@ mod tests {
 
         let connection = &mut establish_connection();
 
-        // diesel::insert_into(crate::schema::measurements::table)
-        //     .values(Measurement {
-        //         id: uuid::Uuid::new_v4(),
-        //         ..std::default::Default::default()
-        //     })
-        //     .returning(Measurement::as_returning())
-        //     .get_result(connection)
-        //     .expect("Error saving measurement");
+        println!(
+            "{}",
+            debug_query::<Sqlite, _>(
+                &diesel::insert_into(crate::schema::measurements::table).values(Measurement {
+                    id: Uuid::new_v4(),
+                    date_time: NaiveDateTime::new(
+                        NaiveDate::from_ymd_opt(2026, 9, 9).unwrap(),
+                        NaiveTime::from_hms_opt(18, 45, 0).unwrap(),
+                    ),
+                    ..std::default::Default::default()
+                }),
+            )
+        );
 
         let results = measurements
             .find(Uuid::parse_str("c746b21f-2839-4160-a8eb-70b2c9a7b23c").unwrap())

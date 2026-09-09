@@ -9,14 +9,14 @@
 #include <QPen>
 #include <QSharedPointer>
 #include <backend/src/backend.cxxqt.h>
+#include <rust/cxx.h>
 
 #include <algorithm>
+#include <format>
 #include <optional>
 #include <random>
-#include <ranges>
 #include <span>
 #include <utility>
-#include <vector>
 
 namespace
 {
@@ -157,77 +157,79 @@ struct BloodPressureGraph::InternalState
 
     std::optional<measurement> under_cursor;
     std::optional<measurement> under_cursor_at_click_start;
+
+    ::rust::Vec<measurement> measurements;
 };
 
 BloodPressureGraph::BloodPressureGraph(QWidget *parent)
     : QCustomPlot{parent}, m_model{nullptr}, m_state{std::make_unique<InternalState>()}
 {
-    std::vector measurements{
+    m_state->measurements = {
         measurement{
-            .date_time = QDateTime{QDate{2026, 8, 15}, QTime{17, 42}}, .systolic = 135, .diastolic = 84, .pulse = 66
+            .systolic = 135, .diastolic = 84, .pulse = 66, .date_time = QDateTime{QDate{2026, 8, 15}, QTime{17, 42}}
         },
         measurement{
-            .date_time = QDateTime{QDate{2026, 8, 24}, QTime{21, 20}}, .systolic = 135, .diastolic = 85, .pulse = 96
+            .systolic = 135, .diastolic = 85, .pulse = 96, .date_time = QDateTime{QDate{2026, 8, 24}, QTime{21, 20}}
         },
         measurement{
-            .date_time = QDateTime{QDate{2026, 8, 28}, QTime{16, 54}}, .systolic = 125, .diastolic = 81, .pulse = 74
+            .systolic = 125, .diastolic = 81, .pulse = 74, .date_time = QDateTime{QDate{2026, 8, 28}, QTime{16, 54}}
         },
         measurement{
-            .date_time = QDateTime{QDate{2026, 8, 29}, QTime{11, 42}}, .systolic = 144, .diastolic = 81, .pulse = 59
+            .systolic = 144, .diastolic = 81, .pulse = 59, .date_time = QDateTime{QDate{2026, 8, 29}, QTime{11, 42}}
         },
         measurement{
-            .date_time = QDateTime{QDate{2026, 8, 29}, QTime{15, 27}}, .systolic = 140, .diastolic = 81, .pulse = 64
+            .systolic = 140, .diastolic = 81, .pulse = 64, .date_time = QDateTime{QDate{2026, 8, 29}, QTime{15, 27}}
         },
         measurement{
-            .date_time = QDateTime{QDate{2026, 8, 29}, QTime{17, 6}}, .systolic = 127, .diastolic = 84, .pulse = 74
+            .systolic = 127, .diastolic = 84, .pulse = 74, .date_time = QDateTime{QDate{2026, 8, 29}, QTime{17, 6}}
         },
         measurement{
-            .date_time = QDateTime{QDate{2026, 8, 30}, QTime{11, 21}}, .systolic = 133, .diastolic = 91, .pulse = 57
+            .systolic = 133, .diastolic = 91, .pulse = 57, .date_time = QDateTime{QDate{2026, 8, 30}, QTime{11, 21}}
         },
         measurement{
-            .date_time = QDateTime{QDate{2026, 8, 31}, QTime{13, 25}}, .systolic = 135, .diastolic = 85, .pulse = 71
+            .systolic = 135, .diastolic = 85, .pulse = 71, .date_time = QDateTime{QDate{2026, 8, 31}, QTime{13, 25}}
         },
         measurement{
-            .date_time = QDateTime{QDate{2026, 9, 1}, QTime{16, 37}}, .systolic = 123, .diastolic = 78, .pulse = 64
+            .systolic = 123, .diastolic = 78, .pulse = 64, .date_time = QDateTime{QDate{2026, 9, 1}, QTime{16, 37}}
         },
         measurement{
-            .date_time = QDateTime{QDate{2026, 9, 2}, QTime{13, 00}}, .systolic = 131, .diastolic = 86, .pulse = 56
+            .systolic = 131, .diastolic = 86, .pulse = 56, .date_time = QDateTime{QDate{2026, 9, 2}, QTime{13, 00}}
         },
         measurement{
-            .date_time = QDateTime{QDate{2026, 9, 2}, QTime{17, 01}}, .systolic = 130, .diastolic = 75, .pulse = 64
+            .systolic = 130, .diastolic = 75, .pulse = 64, .date_time = QDateTime{QDate{2026, 9, 2}, QTime{17, 01}}
         },
         measurement{
-            .date_time = QDateTime{QDate{2026, 9, 3}, QTime{17, 32}}, .systolic = 130, .diastolic = 83, .pulse = 61
+            .systolic = 130, .diastolic = 83, .pulse = 61, .date_time = QDateTime{QDate{2026, 9, 3}, QTime{17, 32}}
         },
         measurement{
-            .date_time = QDateTime{QDate{2026, 9, 5}, QTime{16, 7}}, .systolic = 132, .diastolic = 89, .pulse = 65
+            .systolic = 132, .diastolic = 89, .pulse = 65, .date_time = QDateTime{QDate{2026, 9, 5}, QTime{16, 7}}
         },
         measurement{
-            .date_time = QDateTime{QDate{2026, 9, 7}, QTime{14, 7}}, .systolic = 143, .diastolic = 84, .pulse = 53
+            .systolic = 143, .diastolic = 84, .pulse = 53, .date_time = QDateTime{QDate{2026, 9, 7}, QTime{14, 7}}
         },
     };
     // purposefully deterministic, for repeatability of tests.
     std::mt19937 rng{123456789}; // NOLINT(*-msc51-cpp)
-    for (auto &m: measurements) {
-        std::ranges::for_each(m.id, [&rng](std::uint32_t &n) { n = rng(); });
+    for (auto &m: m_state->measurements) {
+        std::ranges::for_each(m.id, [&rng](std::uint8_t &n) { n = rng(); });
         m.key = QCPAxisTickerDateTime::dateTimeToKey(m.date_time);
         // Mean Arterial Pressure = 1/3*(SBP) + 2/3*(DBP)
         // DOI: 10.1097/CCM.0000000000000324
         m.map = 1.0 / 3 * m.systolic + 2.0 / 3 * m.diastolic;
     }
 
-    const auto g_systolic = addGraph(xAxis, yAxis);
-    const auto g_diastolic = addGraph(xAxis, yAxis);
-    const auto g_map = addGraph(xAxis, yAxis);
+    m_gSystolic = addGraph(xAxis, yAxis);
+    m_gDiastolic = addGraph(xAxis, yAxis);
+    m_gMap = addGraph(xAxis, yAxis);
 
-    const auto g_pulse = addGraph(xAxis, yAxis2);
+    m_gPulse = addGraph(xAxis, yAxis2);
 
     // add data
-    for (auto &&[id, date_time, systolic, diastolic, map, pulse, key]: measurements) {
-        g_systolic->data()->add(QCPGraphData{key, systolic});
-        g_diastolic->data()->add(QCPGraphData{key, diastolic});
-        g_map->data()->add(QCPGraphData{key, map});
-        g_pulse->data()->add(QCPGraphData{key, pulse});
+    for (auto &&m: m_state->measurements) {
+        m_gSystolic->data()->add(QCPGraphData{m.key, m.systolic});
+        m_gDiastolic->data()->add(QCPGraphData{m.key, m.diastolic});
+        m_gMap->data()->add(QCPGraphData{m.key, m.map});
+        m_gPulse->data()->add(QCPGraphData{m.key, m.pulse});
     }
 
     // graph style
@@ -239,25 +241,25 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
     constexpr QColor pulse_color_bg{200, 53, 53, 84};
     constexpr QColor pulse_color_light{250, 210, 210};
 
-    g_systolic->setPen(QPen{pressure_color, 2});
-    g_diastolic->setPen(QPen{pressure_color, 2});
+    m_gSystolic->setPen(QPen{pressure_color, 2});
+    m_gDiastolic->setPen(QPen{pressure_color, 2});
     const QCPScatterStyle blood_scatter{
         QCPScatterStyle::ssDisc,
         QPen{pressure_color},
         QBrush{pressure_color},
         6,
     };
-    g_systolic->setScatterStyle(blood_scatter);
-    g_diastolic->setScatterStyle(blood_scatter);
+    m_gSystolic->setScatterStyle(blood_scatter);
+    m_gDiastolic->setScatterStyle(blood_scatter);
 
-    g_systolic->setBrush(QBrush{pressure_color_bg});
-    g_systolic->setBrush(QBrush{pressure_color_bg});
-    g_systolic->setChannelFillGraph(g_diastolic);
+    m_gSystolic->setBrush(QBrush{pressure_color_bg});
+    m_gSystolic->setBrush(QBrush{pressure_color_bg});
+    m_gSystolic->setChannelFillGraph(m_gDiastolic);
 
-    g_map->setPen(QPen{Qt::white, 2});
+    m_gMap->setPen(QPen{Qt::white, 2});
 
-    g_pulse->setPen(QPen{pulse_color, 2});
-    g_pulse->setScatterStyle(
+    m_gPulse->setPen(QPen{pulse_color, 2});
+    m_gPulse->setScatterStyle(
         QCPScatterStyle{
             QCPScatterStyle::ssCircle,
             QPen{pulse_color},
@@ -270,10 +272,10 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
     axisRect()->setRangeDrag(Qt::Horizontal);
     axisRect()->setRangeZoom(Qt::Horizontal);
     setInteractions(interactions() | QCP::iRangeDrag | QCP::iRangeZoom | QCP::iSelectPlottables);
-    g_systolic->setSelectable(QCP::stSingleData);
-    g_diastolic->setSelectable(QCP::stSingleData);
-    g_map->setSelectable(QCP::stSingleData);
-    g_pulse->setSelectable(QCP::stSingleData);
+    m_gSystolic->setSelectable(QCP::stSingleData);
+    m_gDiastolic->setSelectable(QCP::stSingleData);
+    m_gMap->setSelectable(QCP::stSingleData);
+    m_gPulse->setSelectable(QCP::stSingleData);
 
     // give the axes some labels:
     xAxis->setLabel(tr("Date"));
@@ -290,8 +292,8 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
 
     // set axis ranges, so we see all data
     // default range encompasses all values TODO: default range should probably be current week or something
-    const auto first_day = measurements.front().date_time.date();
-    const auto last_day = measurements.back().date_time.date().addDays(1);
+    const auto first_day = m_state->measurements.front().date_time.date();
+    const auto last_day = m_state->measurements.back().date_time.date().addDays(1);
     xAxis->setRange(QCPAxisTickerDateTime::dateTimeToKey(first_day), QCPAxisTickerDateTime::dateTimeToKey(last_day));
     yAxis->setRange(0, 200);
     yAxis2->setRange(20, 300);
@@ -388,9 +390,7 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
         // use binary search to find the start of the relevant range. Then we search for the closest point in the
         // radius. If there is none, the closest horizontal x-coordinate is used. Otherwise, nothing is found.
         const auto find_closest =
-            [this, &measurements](
-                const QPointF mouse_pos, const double radius_hor_px, const double radius_px, const bool clip_radius
-            )
+            [this](const QPointF mouse_pos, const double radius_hor_px, const double radius_px, const bool clip_radius)
             -> std::variant<std::monostate, std::tuple<measurement_type, measurement, double, QCPAxis *>, measurement> {
             const auto relevant_radius = clip_radius ? radius_hor_px : std::max(radius_hor_px, radius_px);
             const auto key_left = xAxis->range().clamp(xAxis->pixelToCoord(mouse_pos.x() - relevant_radius));
@@ -400,7 +400,8 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
             auto closest_distance_sq = std::numeric_limits<double>::max();
             auto closest_horizontal_distance = std::numeric_limits<double>::max();
             const std::span relevant_measurements{
-                std::ranges::lower_bound(measurements, key_left, {}, &measurement::key), measurements.end()
+                std::ranges::lower_bound(m_state->measurements, key_left, {}, &measurement::key),
+                m_state->measurements.end()
             };
             for (const measurement &m: relevant_measurements) {
                 if (m.key > key_right) break;
@@ -582,10 +583,8 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
 
 BloodPressureGraph::~BloodPressureGraph() = default;
 
-void BloodPressureGraph::setModel(backend::MeasurementModel *model)
+void BloodPressureGraph::setModel(MeasurementModel *model)
 {
-    static std::mt19937 rng{696969};
-
     if (model == m_model) return;
     if (m_model) {
         for (auto &&conn: m_modelConnections)
@@ -593,27 +592,49 @@ void BloodPressureGraph::setModel(backend::MeasurementModel *model)
     }
     m_model = model;
     if (m_model) {
+        const auto req_id = m_model->load_measurements();
         m_modelConnections = {connect(
             m_model,
-            &backend::MeasurementModel::measurements_loaded,
-            [](const uint16_t req_id, const rust::Vec<backend::Measurement> &measurements) {
-                auto debug = qDebug().nospace() << "req id: " << req_id << ", measurements: [";
-                std::ranges::for_each(measurements, [&debug](const backend::Measurement &m) {
+            &MeasurementModel::measurements_loaded,
+            [this, req_id](const uint32_t id, ::rust::Vec<measurement> measurements) {
+                auto debug = qDebug().nospace() << "req id: " << req_id << "(" << id << "), measurements: [";
+                std::ranges::for_each(measurements, [&debug](const measurement &m) {
                     debug = debug << "{s:" << m.systolic << ", d:" << m.diastolic << "},";
                 });
                 debug << "]";
+                setMeasurements(std::move(measurements));
             }
         )};
-        m_model->load_measurements(rng());
     } else {
         m_modelConnections = {};
     }
 }
 
-auto BloodPressureGraph::model() const -> backend::MeasurementModel * { return m_model; }
 
-void BloodPressureGraph::setMapSelectable(const bool value) { m_mapSelectable = value; }
+void BloodPressureGraph::setMeasurements(::rust::Vec<measurement> measurements)
+{
+    m_gSystolic->data()->clear();
+    m_gDiastolic->data()->clear();
+    m_gMap->data()->clear();
+    m_gPulse->data()->clear();
 
-bool BloodPressureGraph::mapSelectable() const { return m_mapSelectable; }
+    for (auto &m: measurements) {
+        if (m.key == 0) m.key = QCPAxisTickerDateTime::dateTimeToKey(m.date_time);
+        if (m.map == 0) {
+            // Mean Arterial Pressure = 1/3*(SBP) + 2/3*(DBP)
+            // DOI: 10.1097/CCM.0000000000000324
+            m.map = 1.0 / 3 * m.systolic + 2.0 / 3 * m.diastolic;
+        }
+
+        m_gSystolic->data()->add(QCPGraphData{m.key, m.systolic});
+        m_gDiastolic->data()->add(QCPGraphData{m.key, m.diastolic});
+        m_gMap->data()->add(QCPGraphData{m.key, m.map});
+        m_gPulse->data()->add(QCPGraphData{m.key, m.pulse});
+    }
+
+    m_state->measurements = std::move(measurements);
+
+    replot(rpQueuedReplot);
+}
 
 void BloodPressureGraph::leaveEvent(QEvent *event) { emit mouseLeave(event); }

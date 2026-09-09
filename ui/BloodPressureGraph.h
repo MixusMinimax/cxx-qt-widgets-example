@@ -5,14 +5,11 @@
 
 #include <QCustomPlot>
 #include <QWidget>
+#include <backend/src/backend.cxxqt.h>
+#include <rust/cxx.h>
 
 #include <array>
 #include <memory>
-
-namespace backend
-{
-    class MeasurementModel;
-}
 
 namespace measurements
 {
@@ -69,28 +66,33 @@ public:
 
     ~BloodPressureGraph() override;
 
-    void setModel(backend::MeasurementModel *model);
+    void setModel(measurements::MeasurementModel *model);
 
-    [[nodiscard]] backend::MeasurementModel *model() const;
+    [[nodiscard]] measurements::MeasurementModel *model() const { return m_model; }
 
     /*!
      * Whether the mean arterial pressure (map) is selectable in the graph. If false, the cursor will not snap to it.
      */
-    void setMapSelectable(bool value);
+    void setMapSelectable(const bool value) { m_mapSelectable = value; }
 
-    [[nodiscard]] bool mapSelectable() const;
+    [[nodiscard]] bool mapSelectable() const { return m_mapSelectable; }
 
 signals:
     void mouseLeave(QEvent *event);
     void measurementEditStarted(measurements::measurement m);
     void measurementCreateStarted(QDateTime date_time);
 
+protected slots:
+    void setMeasurements(::rust::Vec<measurements::measurement> measurements);
+
 protected:
     void leaveEvent(QEvent *event) override;
 
+    QCPGraph *m_gSystolic, *m_gDiastolic, *m_gMap, *m_gPulse;
+
 private:
     bool m_mapSelectable{true};
-    backend::MeasurementModel *m_model{nullptr};
+    measurements::MeasurementModel *m_model{nullptr};
     std::array<QMetaObject::Connection, 1> m_modelConnections;
 
     struct InternalState;

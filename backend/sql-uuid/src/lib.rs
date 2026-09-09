@@ -6,6 +6,7 @@ use diesel::{
     serialize::{self, Output, ToSql},
     sql_types::Binary,
 };
+use std::fmt;
 use uuid::Bytes;
 
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug, Default, FromSqlRow, AsExpression)]
@@ -27,6 +28,30 @@ impl Uuid {
     #[inline]
     pub const fn into_bytes(self) -> Bytes {
         self.0.into_bytes()
+    }
+}
+
+impl fmt::Display for Uuid {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.0, f)
+    }
+}
+
+impl fmt::LowerHex for Uuid {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for b in self.0.as_bytes() {
+            write!(f, "{:x}", b)?;
+        }
+        Ok(())
+    }
+}
+
+impl fmt::UpperHex for Uuid {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for b in self.0.as_bytes() {
+            write!(f, "{:X}", b)?;
+        }
+        Ok(())
     }
 }
 
@@ -60,5 +85,17 @@ where
 {
     fn to_sql<'b>(&'b self, out: &mut Output<'b, '_, B>) -> serialize::Result {
         ToSql::<Binary, B>::to_sql(self.0.as_bytes(), out)
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "v4")]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn print_id_blob() {
+        let id = Uuid::new_v4();
+        println!("{:X}", id);
     }
 }

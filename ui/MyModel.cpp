@@ -1,5 +1,7 @@
 #include "MyModel.h"
 
+#include <backend/src/backend.cxxqt.h>
+
 QDebug measurements::operator<<(QDebug d, const measurement &m)
 {
     return d.nospace()

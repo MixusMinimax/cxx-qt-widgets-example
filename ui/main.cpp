@@ -12,7 +12,7 @@ int main(int argc, char *argv[])
 
     const QApplication app{argc, argv};
 
-    const auto model = std::make_unique<backend::MeasurementModel>();
+    const auto model = std::make_unique<measurements::MeasurementModel>();
     model->initialize(controller->handle());
 
     MainWindow window{};

@@ -9,11 +9,6 @@
 #include <array>
 #include <memory>
 
-namespace backend
-{
-    class MeasurementModel;
-}
-
 QT_BEGIN_NAMESPACE
 namespace Ui
 {
@@ -31,7 +26,7 @@ public:
 
     ~MainWindow() override;
 
-    void setModel(backend::MeasurementModel *model);
+    void setModel(measurements::MeasurementModel *model);
 
 private slots:
     void newProject() const;
@@ -42,7 +37,7 @@ private slots:
     void about() const;
 
 private:
-    backend::MeasurementModel *m_model{nullptr};
+    measurements::MeasurementModel *m_model{nullptr};
     MeasurementModal *m_measurementModal;
     std::array<QMetaObject::Connection, 0> m_modelConnections{};
     std::unique_ptr<Ui::MainWindow> m_ui;

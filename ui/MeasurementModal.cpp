@@ -9,6 +9,8 @@
 #include "overloaded.h"
 #include "ui_MeasurementModal.h"
 
+#include <backend/src/backend.cxxqt.h>
+
 
 MeasurementModal::MeasurementModal(QWidget *parent) : QDialog{parent}, m_ui{std::make_unique<Ui::MeasurementModal>()}
 {
@@ -49,4 +51,6 @@ void MeasurementModal::initialize(const initialize_opts &opts)
         },
         opts
     );
+
+    m_ui->systolicEdit->setFocus(Qt::PopupFocusReason);
 }
