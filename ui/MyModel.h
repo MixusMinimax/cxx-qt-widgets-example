@@ -12,5 +12,8 @@ namespace measurements
 
 template<typename T>
 constexpr bool std::ranges::enable_borrowed_range<::rust::Slice<T>> = true;
+template<typename T>
+constexpr bool std::ranges::enable_view<::rust::Slice<T>> = true;
+
 
 #endif // MYAPP_MYMODEL_H
