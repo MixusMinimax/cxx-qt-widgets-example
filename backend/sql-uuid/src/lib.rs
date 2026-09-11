@@ -40,7 +40,7 @@ impl fmt::Display for Uuid {
 impl fmt::LowerHex for Uuid {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for b in self.0.as_bytes() {
-            write!(f, "{:x}", b)?;
+            write!(f, "{:02x}", b)?;
         }
         Ok(())
     }
@@ -49,7 +49,7 @@ impl fmt::LowerHex for Uuid {
 impl fmt::UpperHex for Uuid {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for b in self.0.as_bytes() {
-            write!(f, "{:X}", b)?;
+            write!(f, "{:02X}", b)?;
         }
         Ok(())
     }
