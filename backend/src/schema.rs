@@ -7,6 +7,6 @@ diesel::table! {
         diastolic -> Double,
         map -> Double,
         pulse -> Double,
-        date_time -> Timestamp,
+        timestamp -> Double,
     }
 }

@@ -57,7 +57,9 @@ void QCPMeasurementPreview::updateText()
         std::pair{tr("Diastolic:"), tr("%1 mmHg").arg(locale.toString(m_measurement.diastolic, 'g', 3))},
         std::pair{tr("Map:"), tr("%1 mmHg").arg(locale.toString(m_measurement.map, 'g', 3))},
         std::pair{tr("Pulse:"), tr("%1 / min").arg(locale.toString(m_measurement.pulse, 'g', 3))},
-        std::pair{tr("Date:"), locale.toString(m_measurement.date_time, m_dateTimeFormat)}
+        std::pair{
+            tr("Date:"), locale.toString(QCPAxisTickerDateTime::keyToDateTime(m_measurement.key), m_dateTimeFormat)
+        }
     };
 }
 
@@ -166,53 +168,94 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
 {
     m_state->measurements = {
         measurement{
-            .systolic = 135, .diastolic = 84, .pulse = 66, .date_time = QDateTime{QDate{2026, 8, 15}, QTime{17, 42}}
+            .systolic = 135,
+            .diastolic = 84,
+            .pulse = 66,
+            .key = QCPAxisTickerDateTime::dateTimeToKey(QDateTime{QDate{2026, 8, 15}, QTime{17, 42}}),
         },
         measurement{
-            .systolic = 135, .diastolic = 85, .pulse = 96, .date_time = QDateTime{QDate{2026, 8, 24}, QTime{21, 20}}
+            .systolic = 135,
+            .diastolic = 85,
+            .pulse = 96,
+            .key = QCPAxisTickerDateTime::dateTimeToKey(QDateTime{QDate{2026, 8, 24}, QTime{21, 20}}),
         },
         measurement{
-            .systolic = 125, .diastolic = 81, .pulse = 74, .date_time = QDateTime{QDate{2026, 8, 28}, QTime{16, 54}}
+            .systolic = 125,
+            .diastolic = 81,
+            .pulse = 74,
+            .key = QCPAxisTickerDateTime::dateTimeToKey(QDateTime{QDate{2026, 8, 28}, QTime{16, 54}}),
         },
         measurement{
-            .systolic = 144, .diastolic = 81, .pulse = 59, .date_time = QDateTime{QDate{2026, 8, 29}, QTime{11, 42}}
+            .systolic = 144,
+            .diastolic = 81,
+            .pulse = 59,
+            .key = QCPAxisTickerDateTime::dateTimeToKey(QDateTime{QDate{2026, 8, 29}, QTime{11, 42}}),
         },
         measurement{
-            .systolic = 140, .diastolic = 81, .pulse = 64, .date_time = QDateTime{QDate{2026, 8, 29}, QTime{15, 27}}
+            .systolic = 140,
+            .diastolic = 81,
+            .pulse = 64,
+            .key = QCPAxisTickerDateTime::dateTimeToKey(QDateTime{QDate{2026, 8, 29}, QTime{15, 27}}),
         },
         measurement{
-            .systolic = 127, .diastolic = 84, .pulse = 74, .date_time = QDateTime{QDate{2026, 8, 29}, QTime{17, 6}}
+            .systolic = 127,
+            .diastolic = 84,
+            .pulse = 74,
+            .key = QCPAxisTickerDateTime::dateTimeToKey(QDateTime{QDate{2026, 8, 29}, QTime{17, 6}}),
         },
         measurement{
-            .systolic = 133, .diastolic = 91, .pulse = 57, .date_time = QDateTime{QDate{2026, 8, 30}, QTime{11, 21}}
+            .systolic = 133,
+            .diastolic = 91,
+            .pulse = 57,
+            .key = QCPAxisTickerDateTime::dateTimeToKey(QDateTime{QDate{2026, 8, 30}, QTime{11, 21}}),
         },
         measurement{
-            .systolic = 135, .diastolic = 85, .pulse = 71, .date_time = QDateTime{QDate{2026, 8, 31}, QTime{13, 25}}
+            .systolic = 135,
+            .diastolic = 85,
+            .pulse = 71,
+            .key = QCPAxisTickerDateTime::dateTimeToKey(QDateTime{QDate{2026, 8, 31}, QTime{13, 25}}),
         },
         measurement{
-            .systolic = 123, .diastolic = 78, .pulse = 64, .date_time = QDateTime{QDate{2026, 9, 1}, QTime{16, 37}}
+            .systolic = 123,
+            .diastolic = 78,
+            .pulse = 64,
+            .key = QCPAxisTickerDateTime::dateTimeToKey(QDateTime{QDate{2026, 9, 1}, QTime{16, 37}}),
         },
         measurement{
-            .systolic = 131, .diastolic = 86, .pulse = 56, .date_time = QDateTime{QDate{2026, 9, 2}, QTime{13, 00}}
+            .systolic = 131,
+            .diastolic = 86,
+            .pulse = 56,
+            .key = QCPAxisTickerDateTime::dateTimeToKey(QDateTime{QDate{2026, 9, 2}, QTime{13, 00}}),
         },
         measurement{
-            .systolic = 130, .diastolic = 75, .pulse = 64, .date_time = QDateTime{QDate{2026, 9, 2}, QTime{17, 01}}
+            .systolic = 130,
+            .diastolic = 75,
+            .pulse = 64,
+            .key = QCPAxisTickerDateTime::dateTimeToKey(QDateTime{QDate{2026, 9, 2}, QTime{17, 01}}),
         },
         measurement{
-            .systolic = 130, .diastolic = 83, .pulse = 61, .date_time = QDateTime{QDate{2026, 9, 3}, QTime{17, 32}}
+            .systolic = 130,
+            .diastolic = 83,
+            .pulse = 61,
+            .key = QCPAxisTickerDateTime::dateTimeToKey(QDateTime{QDate{2026, 9, 3}, QTime{17, 32}}),
         },
         measurement{
-            .systolic = 132, .diastolic = 89, .pulse = 65, .date_time = QDateTime{QDate{2026, 9, 5}, QTime{16, 7}}
+            .systolic = 132,
+            .diastolic = 89,
+            .pulse = 65,
+            .key = QCPAxisTickerDateTime::dateTimeToKey(QDateTime{QDate{2026, 9, 5}, QTime{16, 7}}),
         },
         measurement{
-            .systolic = 143, .diastolic = 84, .pulse = 53, .date_time = QDateTime{QDate{2026, 9, 7}, QTime{14, 7}}
+            .systolic = 143,
+            .diastolic = 84,
+            .pulse = 53,
+            .key = QCPAxisTickerDateTime::dateTimeToKey(QDateTime{QDate{2026, 9, 7}, QTime{14, 7}}),
         },
     };
     // purposefully deterministic, for repeatability of tests.
     std::mt19937 rng{123456789}; // NOLINT(*-msc51-cpp)
     for (auto &m: m_state->measurements) {
         std::ranges::for_each(m.id, [&rng](std::uint8_t &n) { n = rng(); });
-        m.key = QCPAxisTickerDateTime::dateTimeToKey(m.date_time);
         // Mean Arterial Pressure = 1/3*(SBP) + 2/3*(DBP)
         // DOI: 10.1097/CCM.0000000000000324
         m.map = 1.0 / 3 * m.systolic + 2.0 / 3 * m.diastolic;
@@ -292,8 +335,8 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
 
     // set axis ranges, so we see all data
     // default range encompasses all values TODO: default range should probably be current week or something
-    const auto first_day = m_state->measurements.front().date_time.date();
-    const auto last_day = m_state->measurements.back().date_time.date().addDays(1);
+    const auto first_day = QCPAxisTickerDateTime::keyToDateTime(m_state->measurements.front().key).date();
+    const auto last_day = QCPAxisTickerDateTime::keyToDateTime(m_state->measurements.back().key).date().addDays(1);
     xAxis->setRange(QCPAxisTickerDateTime::dateTimeToKey(first_day), QCPAxisTickerDateTime::dateTimeToKey(last_day));
     yAxis->setRange(0, 200);
     yAxis2->setRange(20, 300);
@@ -619,7 +662,6 @@ void BloodPressureGraph::setMeasurements(::rust::Vec<measurement> measurements)
     m_gPulse->data()->clear();
 
     for (auto &m: measurements) {
-        if (m.key == 0) m.key = QCPAxisTickerDateTime::dateTimeToKey(m.date_time);
         if (m.map == 0) {
             // Mean Arterial Pressure = 1/3*(SBP) + 2/3*(DBP)
             // DOI: 10.1097/CCM.0000000000000324

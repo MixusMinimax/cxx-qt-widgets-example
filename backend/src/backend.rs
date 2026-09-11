@@ -1,9 +1,12 @@
 use crate::controller::AsyncControllerHandle;
 use crate::domain::measurement::{Measurement, MeasurementService};
 use cxx_qt::{CxxQtType, Threading};
-use cxx_qt_lib::{QDate, QDateTime, QString, QTime, QTimeZone};
-use diesel::internal::derives::multiconnection::chrono::{Datelike, Timelike};
-use std::cell::{OnceCell, RefCell};
+use cxx_qt_lib::QString;
+use sql_uuid::Uuid;
+use static_assertions::{assert_eq_align, assert_eq_size, const_assert_eq};
+use std::cell::OnceCell;
+use std::mem;
+use std::mem::offset_of;
 use std::pin::Pin;
 use std::sync::Arc;
 
@@ -14,7 +17,6 @@ mod ffi {
         include!("cxx-qt-lib/qdatetime.h");
 
         type QString = cxx_qt_lib::QString;
-        type QDateTime = cxx_qt_lib::QDateTime;
     }
 
     #[namespace = "measurements"]
@@ -27,7 +29,6 @@ mod ffi {
         pub map: f64,
         pub pulse: f64,
         pub key: f64,
-        pub date_time: QDateTime,
     }
 
     #[namespace = "measurements"]
@@ -82,7 +83,7 @@ pub struct MeasurementModelRust {
 struct MeasurementModelRustInner {
     tokio_handle: Box<AsyncControllerHandle>,
     measurement_service: Arc<MeasurementService>,
-    req_id: RefCell<u32>, // no multithreading needed
+    req_id: u32, // no multithreading needed
 }
 
 impl ffi::MeasurementModel {
@@ -98,17 +99,19 @@ impl ffi::MeasurementModel {
     }
 
     pub fn load_measurements(self: Pin<&mut Self>) -> u32 {
-        let rust = self.rust().inner.get().unwrap();
-        let req_id = rust.req_id.replace_with(|i| *i + 1);
         let qt_thread = self.qt_thread();
+        let mut rm = self.rust_mut();
+        let rust = rm.inner.get_mut().unwrap();
+        let req_id = {
+            let req_id = rust.req_id;
+            rust.req_id += 1;
+            req_id
+        };
         let measurement_service: Arc<MeasurementService> = rust.measurement_service.clone();
         rust.tokio_handle.spawn_cb(async move |ct| {
             match measurement_service.load_measurements(ct).await {
                 Ok(v) => {
-                    let v = v
-                        .into_iter()
-                        .map(convert_measurement)
-                        .collect::<Vec<ffi::Measurement>>();
+                    let v = unsafe { mem::transmute::<Vec<Measurement>, Vec<ffi::Measurement>>(v) };
                     qt_thread
                         .queue(move |backend| {
                             backend.measurements_loaded(req_id, v);
@@ -128,21 +131,39 @@ impl ffi::MeasurementModel {
     }
 }
 
-fn convert_measurement(m: Measurement) -> ffi::Measurement {
-    let dt = m.date_time;
-    ffi::Measurement {
-        id: m.id.into_bytes(),
-        systolic: m.systolic,
-        diastolic: m.diastolic,
-        map: m.map,
-        pulse: m.pulse,
-        key: 0.,
-        date_time: QDateTime::from_date_and_time_time_zone(
-            &QDate::new(dt.year(), dt.month() as i32, dt.day() as i32),
-            &QTime::from_msecs_since_start_of_day(
-                dt.num_seconds_from_midnight() as i32 * 1000 + (dt.nanosecond() / 1_000_000) as i32,
-            ),
-            &QTimeZone::system_time_zone(),
-        ),
+macro_rules! assert_eq_field_offsets {
+    ($a:ty, $b:ty $(, $f:ident)*$(,)?) => {
+        $(const_assert_eq!(offset_of!($a, $f), offset_of!($b, $f));)*
+    };
+}
+
+assert_eq_size!(Uuid, [u8; 16]);
+assert_eq_align!(Uuid, [u8; 16]);
+assert_eq_size!(Measurement, ffi::Measurement);
+assert_eq_align!(Measurement, ffi::Measurement);
+assert_eq_field_offsets!(
+    Measurement,
+    ffi::Measurement,
+    id,
+    systolic,
+    diastolic,
+    map,
+    pulse,
+);
+const_assert_eq!(
+    offset_of!(Measurement, timestamp),
+    offset_of!(ffi::Measurement, key)
+);
+
+impl From<Measurement> for ffi::Measurement {
+    fn from(m: Measurement) -> Self {
+        ffi::Measurement {
+            id: m.id.into_bytes(),
+            systolic: m.systolic,
+            diastolic: m.diastolic,
+            map: m.map,
+            pulse: m.pulse,
+            key: m.timestamp,
+        }
     }
 }

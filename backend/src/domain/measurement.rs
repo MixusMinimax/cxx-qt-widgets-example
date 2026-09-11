@@ -10,13 +10,14 @@ use tokio_util::sync::CancellationToken;
 #[derive(Queryable, Selectable, Insertable, Clone, Debug, Default)]
 #[diesel(table_name = crate::schema::measurements)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+#[repr(C)]
 pub struct Measurement {
     pub id: Uuid,
     pub systolic: f64,
     pub diastolic: f64,
     pub map: f64,
     pub pulse: f64,
-    pub date_time: NaiveDateTime,
+    pub timestamp: f64,
 }
 
 #[derive(Debug, PartialEq, thiserror::Error)]
@@ -47,7 +48,7 @@ impl MeasurementService {
             connection.transaction(|connection| {
                 measurements
                     .select(Measurement::as_select())
-                    .order_by(date_time.asc()) // assuming formatted as iso
+                    .order_by(timestamp.asc()) // assuming formatted as iso
                     .load(connection)
             })
         })
@@ -87,10 +88,13 @@ mod tests {
             debug_query::<Sqlite, _>(
                 &diesel::insert_into(crate::schema::measurements::table).values(Measurement {
                     id: Uuid::new_v4(),
-                    date_time: NaiveDateTime::new(
+                    timestamp: NaiveDateTime::new(
                         NaiveDate::from_ymd_opt(2026, 9, 9).unwrap(),
                         NaiveTime::from_hms_opt(18, 45, 0).unwrap(),
-                    ),
+                    )
+                    .and_utc()
+                    .timestamp() as f64
+                        / 1000.0f64,
                     ..std::default::Default::default()
                 }),
             )

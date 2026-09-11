@@ -41,6 +41,7 @@ dependencies = [
  "dotenvy",
  "lazy_static",
  "sql-uuid",
+ "static_assertions",
  "thiserror 2.0.20",
  "tokio",
  "tokio-util",
