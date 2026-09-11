@@ -14,7 +14,6 @@
 #include <algorithm>
 #include <format>
 #include <optional>
-#include <random>
 #include <span>
 #include <utility>
 
@@ -159,121 +158,16 @@ struct BloodPressureGraph::InternalState
 
     std::optional<measurement> under_cursor;
     std::optional<measurement> under_cursor_at_click_start;
-
-    ::rust::Vec<measurement> measurements;
 };
 
 BloodPressureGraph::BloodPressureGraph(QWidget *parent)
     : QCustomPlot{parent}, m_model{nullptr}, m_state{std::make_unique<InternalState>()}
 {
-    m_state->measurements = {
-        measurement{
-            .systolic = 135,
-            .diastolic = 84,
-            .pulse = 66,
-            .key = QCPAxisTickerDateTime::dateTimeToKey(QDateTime{QDate{2026, 8, 15}, QTime{17, 42}}),
-        },
-        measurement{
-            .systolic = 135,
-            .diastolic = 85,
-            .pulse = 96,
-            .key = QCPAxisTickerDateTime::dateTimeToKey(QDateTime{QDate{2026, 8, 24}, QTime{21, 20}}),
-        },
-        measurement{
-            .systolic = 125,
-            .diastolic = 81,
-            .pulse = 74,
-            .key = QCPAxisTickerDateTime::dateTimeToKey(QDateTime{QDate{2026, 8, 28}, QTime{16, 54}}),
-        },
-        measurement{
-            .systolic = 144,
-            .diastolic = 81,
-            .pulse = 59,
-            .key = QCPAxisTickerDateTime::dateTimeToKey(QDateTime{QDate{2026, 8, 29}, QTime{11, 42}}),
-        },
-        measurement{
-            .systolic = 140,
-            .diastolic = 81,
-            .pulse = 64,
-            .key = QCPAxisTickerDateTime::dateTimeToKey(QDateTime{QDate{2026, 8, 29}, QTime{15, 27}}),
-        },
-        measurement{
-            .systolic = 127,
-            .diastolic = 84,
-            .pulse = 74,
-            .key = QCPAxisTickerDateTime::dateTimeToKey(QDateTime{QDate{2026, 8, 29}, QTime{17, 6}}),
-        },
-        measurement{
-            .systolic = 133,
-            .diastolic = 91,
-            .pulse = 57,
-            .key = QCPAxisTickerDateTime::dateTimeToKey(QDateTime{QDate{2026, 8, 30}, QTime{11, 21}}),
-        },
-        measurement{
-            .systolic = 135,
-            .diastolic = 85,
-            .pulse = 71,
-            .key = QCPAxisTickerDateTime::dateTimeToKey(QDateTime{QDate{2026, 8, 31}, QTime{13, 25}}),
-        },
-        measurement{
-            .systolic = 123,
-            .diastolic = 78,
-            .pulse = 64,
-            .key = QCPAxisTickerDateTime::dateTimeToKey(QDateTime{QDate{2026, 9, 1}, QTime{16, 37}}),
-        },
-        measurement{
-            .systolic = 131,
-            .diastolic = 86,
-            .pulse = 56,
-            .key = QCPAxisTickerDateTime::dateTimeToKey(QDateTime{QDate{2026, 9, 2}, QTime{13, 00}}),
-        },
-        measurement{
-            .systolic = 130,
-            .diastolic = 75,
-            .pulse = 64,
-            .key = QCPAxisTickerDateTime::dateTimeToKey(QDateTime{QDate{2026, 9, 2}, QTime{17, 01}}),
-        },
-        measurement{
-            .systolic = 130,
-            .diastolic = 83,
-            .pulse = 61,
-            .key = QCPAxisTickerDateTime::dateTimeToKey(QDateTime{QDate{2026, 9, 3}, QTime{17, 32}}),
-        },
-        measurement{
-            .systolic = 132,
-            .diastolic = 89,
-            .pulse = 65,
-            .key = QCPAxisTickerDateTime::dateTimeToKey(QDateTime{QDate{2026, 9, 5}, QTime{16, 7}}),
-        },
-        measurement{
-            .systolic = 143,
-            .diastolic = 84,
-            .pulse = 53,
-            .key = QCPAxisTickerDateTime::dateTimeToKey(QDateTime{QDate{2026, 9, 7}, QTime{14, 7}}),
-        },
-    };
-    // purposefully deterministic, for repeatability of tests.
-    std::mt19937 rng{123456789}; // NOLINT(*-msc51-cpp)
-    for (auto &m: m_state->measurements) {
-        std::ranges::for_each(m.id, [&rng](std::uint8_t &n) { n = rng(); });
-        // Mean Arterial Pressure = 1/3*(SBP) + 2/3*(DBP)
-        // DOI: 10.1097/CCM.0000000000000324
-        m.map = 1.0 / 3 * m.systolic + 2.0 / 3 * m.diastolic;
-    }
-
     m_gSystolic = addGraph(xAxis, yAxis);
     m_gDiastolic = addGraph(xAxis, yAxis);
     m_gMap = addGraph(xAxis, yAxis);
 
     m_gPulse = addGraph(xAxis, yAxis2);
-
-    // add data
-    for (auto &&m: m_state->measurements) {
-        m_gSystolic->data()->add(QCPGraphData{m.key, m.systolic});
-        m_gDiastolic->data()->add(QCPGraphData{m.key, m.diastolic});
-        m_gMap->data()->add(QCPGraphData{m.key, m.map});
-        m_gPulse->data()->add(QCPGraphData{m.key, m.pulse});
-    }
 
     // graph style
 
@@ -335,9 +229,10 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
 
     // set axis ranges, so we see all data
     // default range encompasses all values TODO: default range should probably be current week or something
-    const auto first_day = QCPAxisTickerDateTime::keyToDateTime(m_state->measurements.front().key).date();
-    const auto last_day = QCPAxisTickerDateTime::keyToDateTime(m_state->measurements.back().key).date().addDays(1);
-    xAxis->setRange(QCPAxisTickerDateTime::dateTimeToKey(first_day), QCPAxisTickerDateTime::dateTimeToKey(last_day));
+    const auto today = QDate::currentDate();
+    const auto start_day = today.addDays(-today.dayOfWeek());
+    const auto end_day = start_day.addDays(7);
+    xAxis->setRange(QCPAxisTickerDateTime::dateTimeToKey(start_day), QCPAxisTickerDateTime::dateTimeToKey(end_day));
     yAxis->setRange(0, 200);
     yAxis2->setRange(20, 300);
 
@@ -443,8 +338,8 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
             auto closest_distance_sq = std::numeric_limits<double>::max();
             auto closest_horizontal_distance = std::numeric_limits<double>::max();
             const std::span relevant_measurements{
-                std::ranges::lower_bound(m_state->measurements, key_left, {}, &measurement::key),
-                m_state->measurements.end()
+                std::ranges::lower_bound(m_model->measurements(), key_left, {}, &measurement::key),
+                m_model->measurements().end()
             };
             for (const measurement &m: relevant_measurements) {
                 if (m.key > key_right) break;
@@ -639,13 +534,13 @@ void BloodPressureGraph::setModel(MeasurementModel *model)
         m_modelConnections = {connect(
             m_model,
             &MeasurementModel::measurements_loaded,
-            [this, req_id](const uint32_t id, ::rust::Vec<measurement> measurements) {
+            [this, req_id](const uint32_t id, const ::rust::Slice<const measurement> measurements) {
                 auto debug = qDebug().nospace() << "req id: " << req_id << "(" << id << "), measurements: [";
                 std::ranges::for_each(measurements, [&debug](const measurement &m) {
                     debug = debug << "{s:" << m.systolic << ", d:" << m.diastolic << "},";
                 });
                 debug << "]";
-                setMeasurements(std::move(measurements));
+                updateMeasurements(measurements);
             }
         )};
     } else {
@@ -654,7 +549,7 @@ void BloodPressureGraph::setModel(MeasurementModel *model)
 }
 
 
-void BloodPressureGraph::setMeasurements(::rust::Vec<measurement> measurements)
+void BloodPressureGraph::updateMeasurements(const ::rust::Slice<const measurement> measurements)
 {
     m_gSystolic->data()->clear();
     m_gDiastolic->data()->clear();
@@ -662,19 +557,11 @@ void BloodPressureGraph::setMeasurements(::rust::Vec<measurement> measurements)
     m_gPulse->data()->clear();
 
     for (auto &m: measurements) {
-        if (m.map == 0) {
-            // Mean Arterial Pressure = 1/3*(SBP) + 2/3*(DBP)
-            // DOI: 10.1097/CCM.0000000000000324
-            m.map = 1.0 / 3 * m.systolic + 2.0 / 3 * m.diastolic;
-        }
-
         m_gSystolic->data()->add(QCPGraphData{m.key, m.systolic});
         m_gDiastolic->data()->add(QCPGraphData{m.key, m.diastolic});
         m_gMap->data()->add(QCPGraphData{m.key, m.map});
         m_gPulse->data()->add(QCPGraphData{m.key, m.pulse});
     }
-
-    m_state->measurements = std::move(measurements);
 
     replot(rpQueuedReplot);
 }

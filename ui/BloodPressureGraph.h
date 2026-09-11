@@ -83,7 +83,7 @@ signals:
     void measurementCreateStarted(QDateTime date_time);
 
 protected slots:
-    void setMeasurements(::rust::Vec<measurements::measurement> measurements);
+    void updateMeasurements(::rust::Slice<const measurements::measurement> measurements);
 
 protected:
     void leaveEvent(QEvent *event) override;

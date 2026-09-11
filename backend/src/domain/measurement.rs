@@ -43,7 +43,7 @@ impl MeasurementService {
         // On the graceful shutdown, we do want to wait so that we don't just abort the process.
         // Dropping the runtime will wait for these blocking tasks to finish.
 
-        let results = spawn_blocking(|| {
+        let mut results = spawn_blocking(|| {
             let connection = &mut establish_connection();
             connection.transaction(|connection| {
                 measurements
@@ -56,6 +56,14 @@ impl MeasurementService {
         .await
         .ok_or_else(|| MeasurementServiceError::Canceled)?
         .expect("join failed")?;
+
+        for m in &mut results {
+            if m.map == 0.0 {
+                // Mean Arterial Pressure = 1/3*(SBP) + 2/3*(DBP)
+                // DOI: 10.1097/CCM.0000000000000324
+                m.map = 1.0 / 3.0 * m.systolic + 2.0 / 3.0 * m.diastolic;
+            }
+        }
 
         Ok(results)
     }

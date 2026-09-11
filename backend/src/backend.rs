@@ -5,10 +5,10 @@ use cxx_qt_lib::QString;
 use sql_uuid::Uuid;
 use static_assertions::{assert_eq_align, assert_eq_size, const_assert_eq};
 use std::cell::OnceCell;
-use std::mem;
 use std::mem::offset_of;
 use std::pin::Pin;
 use std::sync::Arc;
+use std::{mem, slice};
 
 #[cxx_qt::bridge]
 mod ffi {
@@ -60,11 +60,13 @@ mod ffi {
 
         fn load_measurements(self: Pin<&mut MeasurementModel>) -> u32;
 
+        fn measurements(self: &MeasurementModel) -> &[Measurement];
+
         #[qsignal]
         fn measurements_loaded(
             self: Pin<&mut MeasurementModel>,
             req_id: u32,
-            measurements: Vec<Measurement>,
+            measurements: &[Measurement],
         );
 
         #[qsignal]
@@ -84,6 +86,7 @@ struct MeasurementModelRustInner {
     tokio_handle: Box<AsyncControllerHandle>,
     measurement_service: Arc<MeasurementService>,
     req_id: u32, // no multithreading needed
+    measurements: Vec<ffi::Measurement>,
 }
 
 impl ffi::MeasurementModel {
@@ -94,6 +97,7 @@ impl ffi::MeasurementModel {
                 tokio_handle,
                 measurement_service: Default::default(),
                 req_id: Default::default(),
+                measurements: Default::default(),
             })
             .unwrap();
     }
@@ -113,8 +117,19 @@ impl ffi::MeasurementModel {
                 Ok(v) => {
                     let v = unsafe { mem::transmute::<Vec<Measurement>, Vec<ffi::Measurement>>(v) };
                     qt_thread
-                        .queue(move |backend| {
-                            backend.measurements_loaded(req_id, v);
+                        .queue(move |mut backend| {
+                            backend
+                                .as_mut()
+                                .rust_mut()
+                                .inner
+                                .get_mut()
+                                .unwrap()
+                                .measurements = v;
+                            let measurements = unsafe {
+                                let r = &backend.inner.get().unwrap().measurements;
+                                slice::from_raw_parts(r.as_ptr(), r.len())
+                            };
+                            backend.measurements_loaded(req_id, measurements);
                         })
                         .inspect_err(|e| eprintln!("{e}"))
                         .ok();
@@ -128,6 +143,10 @@ impl ffi::MeasurementModel {
             };
         });
         req_id
+    }
+
+    fn measurements(&self) -> &[ffi::Measurement] {
+        &self.rust().inner.get().unwrap().measurements
     }
 }
 
