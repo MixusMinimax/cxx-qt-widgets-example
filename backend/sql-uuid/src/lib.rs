@@ -29,6 +29,11 @@ impl Uuid {
     pub const fn into_bytes(self) -> Bytes {
         self.0.into_bytes()
     }
+
+    #[inline]
+    pub const fn from_bytes(bytes: Bytes) -> Self {
+        Uuid(uuid::Uuid::from_bytes(bytes))
+    }
 }
 
 impl fmt::Display for Uuid {

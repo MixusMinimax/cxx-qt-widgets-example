@@ -56,3 +56,14 @@ void MeasurementModal::initialize(const initialize_opts &opts)
 
     m_ui->systolicEdit->setFocus(Qt::PopupFocusReason);
 }
+
+measurements::measurement MeasurementModal::measurement() const
+{
+    return measurements::measurement{
+        .systolic = static_cast<double>(m_ui->systolicEdit->value()),
+        .diastolic = static_cast<double>(m_ui->diastolicEdit->value()),
+        .map = static_cast<double>(m_ui->mapEdit->value()),
+        .pulse = static_cast<double>(m_ui->pulseEdit->value()),
+        .key = QCPAxisTickerDateTime::dateTimeToKey(m_ui->dateTimeEdit->dateTime())
+    };
+}

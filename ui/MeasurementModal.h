@@ -5,12 +5,15 @@
 #ifndef MYAPP_MEASUREMENTMODAL_H
 #define MYAPP_MEASUREMENTMODAL_H
 
-#include <MyModel.h>
-
 #include <QDialog>
 
 #include <memory>
-#include <optional>
+
+
+namespace measurements
+{
+    struct measurement;
+}
 
 
 QT_BEGIN_NAMESPACE
@@ -31,6 +34,8 @@ public:
     ~MeasurementModal() override;
 
     void initialize(const initialize_opts &opts);
+
+    [[nodiscard]] measurements::measurement measurement() const;
 
 private:
     std::unique_ptr<Ui::MeasurementModal> m_ui;

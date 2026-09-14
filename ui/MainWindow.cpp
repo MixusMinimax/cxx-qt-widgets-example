@@ -32,7 +32,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_ui->actionAbout, &QAction::triggered, this, &MainWindow::about);
 
     connect(m_ui->graphOutput, &BloodPressureGraph::measurementEditStarted, [this](measurements::measurement m) {
-        m_measurementModal->initialize(std::move(m));
+        m_measurementModal->initialize(m);
         m_measurementModal->setModal(true);
         m_measurementModal->show();
     });
@@ -41,6 +41,10 @@ MainWindow::MainWindow(QWidget *parent)
         m_measurementModal->initialize(std::move(date_time));
         m_measurementModal->setModal(true);
         m_measurementModal->show();
+    });
+
+    connect(m_measurementModal, &MeasurementModal::accepted, [this] {
+        m_model->create_measurement(m_measurementModal->measurement());
     });
 }
 

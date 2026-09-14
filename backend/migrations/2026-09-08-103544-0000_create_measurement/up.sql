@@ -5,5 +5,6 @@ CREATE TABLE measurements
     diastolic DOUBLE NOT NULL,
     map       DOUBLE NOT NULL DEFAULT 0,
     pulse     DOUBLE NOT NULL,
-    timestamp DOUBLE not null
-) WITHOUT ROWID
+    timestamp DOUBLE NOT NULL UNIQUE
+) WITHOUT ROWID;
+

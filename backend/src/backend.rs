@@ -1,5 +1,5 @@
 use crate::controller::AsyncControllerHandle;
-use crate::domain::measurement::{Measurement, MeasurementService};
+use crate::domain::measurement::{Measurement, MeasurementService, MeasurementServiceError};
 use cxx_qt::{CxxQtType, Threading};
 use cxx_qt_lib::QString;
 use sql_uuid::Uuid;
@@ -9,6 +9,7 @@ use std::mem::offset_of;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::{mem, slice};
+use tokio_util::sync::CancellationToken;
 
 #[cxx_qt::bridge]
 mod ffi {
@@ -60,6 +61,8 @@ mod ffi {
 
         fn load_measurements(self: Pin<&mut MeasurementModel>) -> u32;
 
+        fn create_measurement(self: Pin<&mut MeasurementModel>, measurement: Measurement) -> u32;
+
         fn measurements(self: &MeasurementModel) -> &[Measurement];
 
         #[qsignal]
@@ -89,6 +92,42 @@ struct MeasurementModelRustInner {
     measurements: Vec<ffi::Measurement>,
 }
 
+#[derive(Debug, PartialEq, thiserror::Error)]
+enum HandlerError {
+    #[error("MeasurementServiceError")]
+    MeasurementServiceError(#[from] MeasurementServiceError),
+}
+
+fn handle_request<F, O, RF>(mut m: Pin<&mut ffi::MeasurementModel>, handler: F) -> u32
+where
+    RF: FnOnce(Pin<&mut ffi::MeasurementModel>) + Send + 'static,
+    O: Future<Output = Result<RF, HandlerError>> + Send + 'static,
+    F: FnOnce(CancellationToken, u32, Arc<MeasurementService>) -> O + Send + 'static,
+{
+    let mut rm = m.as_mut().rust_mut();
+    let inner = rm.inner.get_mut().unwrap();
+    let req_id = inner.req_id;
+    inner.req_id += 1;
+    let qt_thread = m.qt_thread();
+    let rust = m.rust().inner.get().unwrap();
+    let measurement_service: Arc<MeasurementService> = rust.measurement_service.clone();
+    rust.tokio_handle.spawn_cb(async move |ct| {
+        match handler(ct, req_id, measurement_service).await {
+            Ok(cb) => {
+                qt_thread.queue(cb).inspect_err(|e| eprintln!("{e}")).ok();
+            }
+            Err(e) => {
+                qt_thread
+                    .queue(move |backend| backend.failure(req_id, QString::from(e.to_string())))
+                    .inspect_err(|e| eprintln!("{e}"))
+                    .ok();
+            }
+        }
+    });
+
+    req_id
+}
+
 impl ffi::MeasurementModel {
     pub fn initialize(self: Pin<&mut Self>, tokio_handle: Box<AsyncControllerHandle>) {
         self.rust_mut()
@@ -103,46 +142,45 @@ impl ffi::MeasurementModel {
     }
 
     pub fn load_measurements(self: Pin<&mut Self>) -> u32 {
-        let qt_thread = self.qt_thread();
-        let mut rm = self.rust_mut();
-        let rust = rm.inner.get_mut().unwrap();
-        let req_id = {
-            let req_id = rust.req_id;
-            rust.req_id += 1;
-            req_id
-        };
-        let measurement_service: Arc<MeasurementService> = rust.measurement_service.clone();
-        rust.tokio_handle.spawn_cb(async move |ct| {
-            match measurement_service.load_measurements(ct).await {
-                Ok(v) => {
-                    let v = unsafe { mem::transmute::<Vec<Measurement>, Vec<ffi::Measurement>>(v) };
-                    qt_thread
-                        .queue(move |mut backend| {
-                            backend
-                                .as_mut()
-                                .rust_mut()
-                                .inner
-                                .get_mut()
-                                .unwrap()
-                                .measurements = v;
-                            let measurements = unsafe {
-                                let r = &backend.inner.get().unwrap().measurements;
-                                slice::from_raw_parts(r.as_ptr(), r.len())
-                            };
-                            backend.measurements_loaded(req_id, measurements);
-                        })
-                        .inspect_err(|e| eprintln!("{e}"))
-                        .ok();
-                }
-                Err(e) => {
-                    qt_thread
-                        .queue(move |backend| backend.failure(req_id, QString::from(e.to_string())))
-                        .inspect_err(|e| eprintln!("{e}"))
-                        .ok();
-                }
-            };
-        });
-        req_id
+        handle_request(self, async |_, req_id, measurement_service| {
+            let v = measurement_service.load_measurements().await?;
+            let v = unsafe { mem::transmute::<Vec<Measurement>, Vec<ffi::Measurement>>(v) };
+            Ok(move |mut backend: Pin<&mut ffi::MeasurementModel>| {
+                backend
+                    .as_mut()
+                    .rust_mut()
+                    .inner
+                    .get_mut()
+                    .unwrap()
+                    .measurements = v;
+                let measurements = unsafe {
+                    let r = &backend.inner.get().unwrap().measurements;
+                    slice::from_raw_parts(r.as_ptr(), r.len())
+                };
+                backend.measurements_loaded(req_id, measurements);
+            })
+        })
+    }
+
+    pub fn create_measurement(self: Pin<&mut Self>, measurement: ffi::Measurement) -> u32 {
+        handle_request(self, async |_, req_id, measurement_service| {
+            let m = measurement_service
+                .save_measurement_new(measurement.into())
+                .await?;
+            let m = ffi::Measurement::from(m);
+            Ok(move |mut backend: Pin<&mut ffi::MeasurementModel>| {
+                let mut rm = backend.as_mut().rust_mut();
+                let measurements = &mut rm.inner.get_mut().unwrap().measurements;
+                let idx = measurements.partition_point(|x| x.key <= m.key);
+                // expensive. Might consider something else down the line.
+                measurements.insert(idx, m);
+                let measurements = unsafe {
+                    let r = measurements;
+                    slice::from_raw_parts(r.as_ptr(), r.len())
+                };
+                backend.measurements_loaded(req_id, measurements);
+            })
+        })
     }
 
     fn measurements(&self) -> &[ffi::Measurement] {
@@ -183,6 +221,19 @@ impl From<Measurement> for ffi::Measurement {
             map: m.map,
             pulse: m.pulse,
             key: m.timestamp,
+        }
+    }
+}
+
+impl From<ffi::Measurement> for Measurement {
+    fn from(m: ffi::Measurement) -> Self {
+        Measurement {
+            id: Uuid::from_bytes(m.id),
+            systolic: m.systolic,
+            diastolic: m.diastolic,
+            map: m.map,
+            pulse: m.pulse,
+            timestamp: m.key,
         }
     }
 }

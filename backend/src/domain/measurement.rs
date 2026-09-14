@@ -1,14 +1,12 @@
-use diesel::internal::derives::multiconnection::chrono::NaiveDateTime;
-use diesel::{Connection, Insertable, Queryable, Selectable, SqliteConnection};
+use diesel::{AsChangeset, Connection, Insertable, Queryable, Selectable, SqliteConnection};
 use dotenvy::dotenv;
 use sql_uuid::Uuid;
-use std::env;
+use std::{env, mem};
 use tokio::task::spawn_blocking;
-use tokio_util::future::FutureExt;
-use tokio_util::sync::CancellationToken;
 
 #[derive(Queryable, Selectable, Insertable, Clone, Debug, Default)]
 #[diesel(table_name = crate::schema::measurements)]
+#[diesel(primary_key(id))]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 #[repr(C)]
 pub struct Measurement {
@@ -20,52 +18,99 @@ pub struct Measurement {
     pub timestamp: f64,
 }
 
+#[derive(AsChangeset, Clone, Debug, Default)]
+#[diesel(table_name = crate::schema::measurements)]
+#[diesel(primary_key(id))]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct MeasurementChangeset {
+    pub id: Uuid,
+    pub systolic: Option<f64>,
+    pub diastolic: Option<f64>,
+    pub map: Option<f64>,
+    pub pulse: Option<f64>,
+    pub timestamp: Option<f64>,
+}
+
 #[derive(Debug, PartialEq, thiserror::Error)]
 pub enum MeasurementServiceError {
     #[error("diesel error")]
     Diesel(#[from] diesel::result::Error),
-    #[error("canceled")]
-    Canceled,
 }
 
 #[derive(Debug, Default)]
 pub struct MeasurementService {}
 
+fn fix_map(m: &mut Measurement) {
+    if m.map == 0.0 {
+        // Mean Arterial Pressure = 1/3*(SBP) + 2/3*(DBP)
+        // DOI: 10.1097/CCM.0000000000000324
+        m.map = 1.0 / 3.0 * m.systolic + 2.0 / 3.0 * m.diastolic;
+    }
+}
+
 impl MeasurementService {
-    pub async fn load_measurements(
-        &self,
-        ct: CancellationToken,
-    ) -> Result<Vec<Measurement>, MeasurementServiceError> {
+    pub async fn load_measurements(&self) -> Result<Vec<Measurement>, MeasurementServiceError> {
         use crate::schema::measurements::dsl::*;
         use diesel::prelude::*;
 
-        // will run to completion either way, but we don't want to wait for completion here.
-        // On the graceful shutdown, we do want to wait so that we don't just abort the process.
-        // Dropping the runtime will wait for these blocking tasks to finish.
-
         let mut results = spawn_blocking(|| {
-            let connection = &mut establish_connection();
-            connection.transaction(|connection| {
+            establish_connection().transaction(|connection| {
                 measurements
                     .select(Measurement::as_select())
                     .order_by(timestamp.asc()) // assuming formatted as iso
                     .load(connection)
             })
         })
-        .with_cancellation_token(&ct)
         .await
-        .ok_or_else(|| MeasurementServiceError::Canceled)?
         .expect("join failed")?;
 
-        for m in &mut results {
-            if m.map == 0.0 {
-                // Mean Arterial Pressure = 1/3*(SBP) + 2/3*(DBP)
-                // DOI: 10.1097/CCM.0000000000000324
-                m.map = 1.0 / 3.0 * m.systolic + 2.0 / 3.0 * m.diastolic;
-            }
-        }
+        results.iter_mut().for_each(fix_map);
 
         Ok(results)
+    }
+
+    pub async fn save_measurement_new(
+        &self,
+        mut measurement: Measurement,
+    ) -> Result<Measurement, MeasurementServiceError> {
+        fix_map(&mut measurement);
+        let measurement = Measurement {
+            id: Uuid::new_v4(),
+            ..measurement
+        };
+
+        use crate::schema::measurements::dsl::*;
+        use diesel::prelude::*;
+
+        spawn_blocking(|| {
+            establish_connection().transaction(|connection| {
+                diesel::insert_into(measurements)
+                    .values(measurement)
+                    .get_result(connection)
+            })
+        })
+        .await
+        .expect("join failed")
+        .map_err(Into::into)
+    }
+
+    pub async fn update_measurement(
+        &self,
+        measurement_changeset: MeasurementChangeset,
+    ) -> Result<Measurement, MeasurementServiceError> {
+        use crate::schema::measurements::dsl::*;
+        use diesel::prelude::*;
+
+        spawn_blocking(|| {
+            establish_connection().transaction(|connection| {
+                diesel::update(measurements)
+                    .set(measurement_changeset)
+                    .get_result(connection)
+            })
+        })
+        .await
+        .expect("join failed")
+        .map_err(Into::into)
     }
 }
 
@@ -81,7 +126,7 @@ fn establish_connection() -> SqliteConnection {
 mod tests {
     use super::*;
     use diesel::debug_query;
-    use diesel::internal::derives::multiconnection::chrono::{NaiveDate, NaiveTime};
+    use diesel::internal::derives::multiconnection::chrono::{NaiveDate, NaiveDateTime, NaiveTime};
     use diesel::prelude::*;
     use diesel::sqlite::Sqlite;
 
