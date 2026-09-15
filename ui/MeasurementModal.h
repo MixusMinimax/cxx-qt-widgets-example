@@ -7,6 +7,7 @@
 
 #include <QDialog>
 
+#include <array>
 #include <memory>
 #include <variant>
 
@@ -56,6 +57,7 @@ protected:
 
 private:
     std::unique_ptr<Ui::MeasurementModal> m_ui;
+    std::array<std::uint8_t, 16> m_id{};
 };
 
 

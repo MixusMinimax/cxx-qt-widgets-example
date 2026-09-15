@@ -1,6 +1,7 @@
 use crate::controller::AsyncControllerHandle;
 use crate::domain::measurement::{
-    Measurement, MeasurementService, MeasurementServiceError, MeasurementUpdated,
+    Measurement, MeasurementChangeset, MeasurementService, MeasurementServiceError,
+    MeasurementUpdated,
 };
 use cxx_qt::{CxxQtType, Threading};
 use cxx_qt_lib::QString;
@@ -192,9 +193,9 @@ impl ffi::MeasurementModel {
     fn update_measurement(self: Pin<&mut Self>, measurement: ffi::Measurement) -> u32 {
         handle_request(self, async |_, req_id, measurement_service| {
             let MeasurementUpdated { new, old_ts } = measurement_service
-                .update_measurement(Default::default())
+                .update_measurement(measurement.into())
                 .await?;
-            let new = ffi::Measurement::from(new);
+            let new: ffi::Measurement = new.into();
             Ok(move |mut backend: Pin<&mut ffi::MeasurementModel>| {
                 let mut rm = backend.as_mut().rust_mut();
                 let measurements = &mut rm.inner.get_mut().unwrap().measurements;
@@ -284,6 +285,22 @@ impl From<ffi::Measurement> for Measurement {
             map: m.map,
             pulse: m.pulse,
             timestamp: m.key,
+        }
+    }
+}
+
+impl From<ffi::Measurement> for MeasurementChangeset {
+    fn from(m: ffi::Measurement) -> Self {
+        fn nonzero(f: f64) -> Option<f64> {
+            if f != 0. { Some(f) } else { None }
+        }
+        MeasurementChangeset {
+            id: Uuid::from_bytes(m.id),
+            systolic: nonzero(m.systolic),
+            diastolic: nonzero(m.diastolic),
+            map: nonzero(m.map),
+            pulse: nonzero(m.pulse),
+            timestamp: nonzero(m.key),
         }
     }
 }

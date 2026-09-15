@@ -49,6 +49,7 @@ void MeasurementModal::initialize(const initialize_opts &opts)
         overloaded{
             [&, this](const measurements::measurement &measurement) {
                 m_acceptMode = AcceptUpdate;
+                m_id = measurement.id;
                 m_ui->internalIDEdit->setText(std::format("{:x}", util::uuid{measurement.id}).data());
                 initialize(m_ui->systolicEdit, measurement.systolic);
                 initialize(m_ui->diastolicEdit, measurement.diastolic);
@@ -58,6 +59,7 @@ void MeasurementModal::initialize(const initialize_opts &opts)
             },
             [&, this](const QDateTime &date_time) {
                 m_acceptMode = AcceptCreate;
+                m_id = {};
                 m_ui->internalIDEdit->setText(tr("new"));
                 m_ui->systolicEdit->clear();
                 m_ui->diastolicEdit->clear();
@@ -76,6 +78,7 @@ void MeasurementModal::initialize(const initialize_opts &opts)
 measurements::measurement MeasurementModal::measurement() const
 {
     return measurements::measurement{
+        .id = m_id,
         .systolic = static_cast<double>(m_ui->systolicEdit->value()),
         .diastolic = static_cast<double>(m_ui->diastolicEdit->value()),
         .map = static_cast<double>(m_ui->mapEdit->hasAcceptableInput() ? m_ui->mapEdit->value() : 0),

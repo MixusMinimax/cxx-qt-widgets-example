@@ -48,7 +48,14 @@ MainWindow::MainWindow(QWidget *parent)
     });
 
     connect(m_measurementModal, &MeasurementModal::accepted, [this] {
-        m_model->create_measurement(m_measurementModal->measurement());
+        switch (m_measurementModal->acceptMode()) {
+            case MeasurementModal::AcceptCreate:
+                m_model->create_measurement(m_measurementModal->measurement());
+                break;
+            case MeasurementModal::AcceptUpdate:
+                m_model->update_measurement(m_measurementModal->measurement());
+                break;
+        }
     });
 }
 

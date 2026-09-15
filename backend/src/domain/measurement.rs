@@ -1,7 +1,8 @@
+use diesel::sqlite::Sqlite;
 use diesel::{AsChangeset, Connection, Insertable, Queryable, Selectable, SqliteConnection};
 use dotenvy::dotenv;
 use sql_uuid::Uuid;
-use std::{env, mem};
+use std::env;
 use tokio::task::spawn_blocking;
 
 #[derive(Queryable, Selectable, Insertable, Clone, PartialEq, Debug, Default)]
@@ -114,7 +115,7 @@ impl MeasurementService {
                     .select(timestamp)
                     .get_result(connection)?;
 
-                let new = diesel::update(measurements)
+                let new = diesel::update(measurements.find(measurement_changeset.id))
                     .set(measurement_changeset)
                     .get_result(connection)?;
 
