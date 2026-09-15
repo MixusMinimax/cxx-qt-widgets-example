@@ -31,12 +31,28 @@ class MeasurementModal : public QDialog
     Q_OBJECT
 
 public:
+    enum AcceptMode
+    {
+        AcceptCreate,
+        AcceptUpdate,
+    };
+    Q_ENUM(AcceptMode)
+
     explicit MeasurementModal(QWidget *parent = nullptr);
     ~MeasurementModal() override;
 
     void initialize(const initialize_opts &opts);
-
     [[nodiscard]] measurements::measurement measurement() const;
+
+    [[nodiscard]] AcceptMode acceptMode() const;
+
+protected slots:
+    bool validate();
+
+protected:
+    void accept() override;
+
+    AcceptMode m_acceptMode;
 
 private:
     std::unique_ptr<Ui::MeasurementModal> m_ui;
