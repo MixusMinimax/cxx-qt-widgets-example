@@ -8,6 +8,7 @@
 #include <QDialog>
 
 #include <memory>
+#include <variant>
 
 
 namespace measurements

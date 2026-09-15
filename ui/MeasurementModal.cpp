@@ -12,6 +12,7 @@
 #include <backend/src/backend.cxxqt.h>
 
 #include "qcustomplot.h"
+#include "util.h"
 
 
 MeasurementModal::MeasurementModal(QWidget *parent) : QDialog{parent}, m_ui{std::make_unique<Ui::MeasurementModal>()}
@@ -37,6 +38,7 @@ void MeasurementModal::initialize(const initialize_opts &opts)
     std::visit(
         overloaded{
             [&, this](const measurements::measurement &measurement) {
+                m_ui->internalIDEdit->setText(std::format("{:x}", util::uuid{measurement.id}).data());
                 initialize(m_ui->systolicEdit, measurement.systolic);
                 initialize(m_ui->diastolicEdit, measurement.diastolic);
                 initialize(m_ui->mapEdit, measurement.map);
@@ -44,6 +46,7 @@ void MeasurementModal::initialize(const initialize_opts &opts)
                 m_ui->dateTimeEdit->setDateTime(QCPAxisTickerDateTime::keyToDateTime(measurement.key));
             },
             [&, this](const QDateTime &date_time) {
+                m_ui->internalIDEdit->setText(tr("new"));
                 m_ui->systolicEdit->clear();
                 m_ui->diastolicEdit->clear();
                 m_ui->mapEdit->clear();

@@ -1,3 +1,6 @@
+-- This seems to be on by default now in my case, but doesn't hurt to be specific:
+PRAGMA journal_mode = WAL;
+
 CREATE TABLE measurements
 (
     id        BLOB   NOT NULL PRIMARY KEY,
@@ -7,4 +10,3 @@ CREATE TABLE measurements
     pulse     DOUBLE NOT NULL,
     timestamp DOUBLE NOT NULL UNIQUE
 ) WITHOUT ROWID;
-

@@ -4,7 +4,7 @@ use sql_uuid::Uuid;
 use std::{env, mem};
 use tokio::task::spawn_blocking;
 
-#[derive(Queryable, Selectable, Insertable, Clone, Debug, Default)]
+#[derive(Queryable, Selectable, Insertable, Clone, PartialEq, Debug, Default)]
 #[diesel(table_name = crate::schema::measurements)]
 #[diesel(primary_key(id))]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
@@ -46,6 +46,12 @@ fn fix_map(m: &mut Measurement) {
         // DOI: 10.1097/CCM.0000000000000324
         m.map = 1.0 / 3.0 * m.systolic + 2.0 / 3.0 * m.diastolic;
     }
+}
+
+#[derive(Clone, PartialEq, Debug, Default)]
+pub struct MeasurementUpdated {
+    pub new: Measurement,
+    pub old_ts: f64,
 }
 
 impl MeasurementService {
@@ -97,20 +103,26 @@ impl MeasurementService {
     pub async fn update_measurement(
         &self,
         measurement_changeset: MeasurementChangeset,
-    ) -> Result<Measurement, MeasurementServiceError> {
+    ) -> Result<MeasurementUpdated, MeasurementServiceError> {
         use crate::schema::measurements::dsl::*;
         use diesel::prelude::*;
 
         spawn_blocking(|| {
-            establish_connection().transaction(|connection| {
-                diesel::update(measurements)
+            establish_connection().transaction::<_, MeasurementServiceError, _>(|connection| {
+                let old_ts = measurements
+                    .find(measurement_changeset.id)
+                    .select(timestamp)
+                    .get_result(connection)?;
+
+                let new = diesel::update(measurements)
                     .set(measurement_changeset)
-                    .get_result(connection)
+                    .get_result(connection)?;
+
+                Ok(MeasurementUpdated { new, old_ts })
             })
         })
         .await
         .expect("join failed")
-        .map_err(Into::into)
     }
 }
 

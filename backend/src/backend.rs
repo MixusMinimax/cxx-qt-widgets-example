@@ -1,10 +1,13 @@
 use crate::controller::AsyncControllerHandle;
-use crate::domain::measurement::{Measurement, MeasurementService, MeasurementServiceError};
+use crate::domain::measurement::{
+    Measurement, MeasurementService, MeasurementServiceError, MeasurementUpdated,
+};
 use cxx_qt::{CxxQtType, Threading};
 use cxx_qt_lib::QString;
 use sql_uuid::Uuid;
 use static_assertions::{assert_eq_align, assert_eq_size, const_assert_eq};
 use std::cell::OnceCell;
+use std::cmp::Ordering;
 use std::mem::offset_of;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -62,6 +65,8 @@ mod ffi {
         fn load_measurements(self: Pin<&mut MeasurementModel>) -> u32;
 
         fn create_measurement(self: Pin<&mut MeasurementModel>, measurement: Measurement) -> u32;
+
+        fn update_measurement(self: Pin<&mut MeasurementModel>, measurement: Measurement) -> u32;
 
         fn measurements(self: &MeasurementModel) -> &[Measurement];
 
@@ -129,7 +134,7 @@ where
 }
 
 impl ffi::MeasurementModel {
-    pub fn initialize(self: Pin<&mut Self>, tokio_handle: Box<AsyncControllerHandle>) {
+    fn initialize(self: Pin<&mut Self>, tokio_handle: Box<AsyncControllerHandle>) {
         self.rust_mut()
             .inner
             .set(MeasurementModelRustInner {
@@ -141,7 +146,7 @@ impl ffi::MeasurementModel {
             .unwrap();
     }
 
-    pub fn load_measurements(self: Pin<&mut Self>) -> u32 {
+    fn load_measurements(self: Pin<&mut Self>) -> u32 {
         handle_request(self, async |_, req_id, measurement_service| {
             let v = measurement_service.load_measurements().await?;
             let v = unsafe { mem::transmute::<Vec<Measurement>, Vec<ffi::Measurement>>(v) };
@@ -162,7 +167,7 @@ impl ffi::MeasurementModel {
         })
     }
 
-    pub fn create_measurement(self: Pin<&mut Self>, measurement: ffi::Measurement) -> u32 {
+    fn create_measurement(self: Pin<&mut Self>, measurement: ffi::Measurement) -> u32 {
         handle_request(self, async |_, req_id, measurement_service| {
             let m = measurement_service
                 .save_measurement_new(measurement.into())
@@ -174,6 +179,50 @@ impl ffi::MeasurementModel {
                 let idx = measurements.partition_point(|x| x.key <= m.key);
                 // expensive. Might consider something else down the line.
                 measurements.insert(idx, m);
+                let measurements = unsafe {
+                    let r = measurements;
+                    slice::from_raw_parts(r.as_ptr(), r.len())
+                };
+                backend.measurements_loaded(req_id, measurements);
+            })
+        })
+    }
+
+    fn update_measurement(self: Pin<&mut Self>, measurement: ffi::Measurement) -> u32 {
+        handle_request(self, async |_, req_id, measurement_service| {
+            let MeasurementUpdated { new, old_ts } = measurement_service
+                .update_measurement(Default::default())
+                .await?;
+            let new = ffi::Measurement::from(new);
+            Ok(move |mut backend: Pin<&mut ffi::MeasurementModel>| {
+                let mut rm = backend.as_mut().rust_mut();
+                let measurements = &mut rm.inner.get_mut().unwrap().measurements;
+                let idx = measurements.partition_point(|x| x.key < new.key);
+                // PartialOrd vs Ord is not relevant because nothing is NAN or infinity.
+
+                if new.key != old_ts
+                    && let Ok(old_idx) = if old_ts < new.key {
+                        measurements[..=idx].binary_search_by(|x| {
+                            x.key.partial_cmp(&old_ts).unwrap_or(Ordering::Equal)
+                        })
+                    } else {
+                        measurements[idx..]
+                            .binary_search_by(|x| {
+                                x.key.partial_cmp(&old_ts).unwrap_or(Ordering::Equal)
+                            })
+                            .map(|i| i + idx)
+                    }
+                    && idx != old_idx
+                {
+                    measurements[old_idx] = new;
+                    if idx < old_idx {
+                        measurements[idx..old_idx].rotate_right(1);
+                    } else {
+                        measurements[old_idx..idx].rotate_left(1);
+                    }
+                } else {
+                    measurements[idx] = new;
+                }
                 let measurements = unsafe {
                     let r = measurements;
                     slice::from_raw_parts(r.as_ptr(), r.len())
