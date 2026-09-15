@@ -99,7 +99,7 @@ struct MeasurementModelRustInner {
 
 #[derive(Debug, PartialEq, thiserror::Error)]
 enum HandlerError {
-    #[error("MeasurementServiceError")]
+    #[error("MeasurementServiceError: {0}")]
     MeasurementServiceError(#[from] MeasurementServiceError),
 }
 
@@ -122,6 +122,7 @@ where
                 qt_thread.queue(cb).inspect_err(|e| eprintln!("{e}")).ok();
             }
             Err(e) => {
+                eprintln!("{}", e);
                 qt_thread
                     .queue(move |backend| backend.failure(req_id, QString::from(e.to_string())))
                     .inspect_err(|e| eprintln!("{e}"))

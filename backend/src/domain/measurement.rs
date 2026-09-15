@@ -33,7 +33,7 @@ pub struct MeasurementChangeset {
 
 #[derive(Debug, PartialEq, thiserror::Error)]
 pub enum MeasurementServiceError {
-    #[error("diesel error")]
+    #[error("diesel error: {0}")]
     Diesel(#[from] diesel::result::Error),
 }
 
