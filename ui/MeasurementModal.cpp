@@ -32,6 +32,11 @@ MeasurementModal::MeasurementModal(QWidget *parent) : QDialog{parent}, m_ui{std:
 
     connect(m_ui->buttonBox, &QDialogButtonBox::accepted, this, &QDialog::accept);
     connect(m_ui->buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
+
+    connect(m_ui->deleteButton, &QPushButton::clicked, [this] {
+        m_acceptMode = AcceptDelete;
+        accept();
+    });
 }
 
 MeasurementModal::~MeasurementModal() = default;
@@ -51,6 +56,7 @@ void MeasurementModal::initialize(const initialize_opts &opts)
             [&, this](const measurements::measurement &measurement) {
                 m_acceptMode = AcceptUpdate;
                 m_id = measurement.id;
+                m_ui->deleteButton->setVisible(true);
                 m_ui->internalIDEdit->setText(std::format("{:x}", util::uuid{measurement.id}).data());
                 initialize(m_ui->systolicEdit, measurement.systolic);
                 initialize(m_ui->diastolicEdit, measurement.diastolic);
@@ -61,6 +67,7 @@ void MeasurementModal::initialize(const initialize_opts &opts)
             [&, this](const QDateTime &date_time) {
                 m_acceptMode = AcceptCreate;
                 m_id = {};
+                m_ui->deleteButton->setVisible(false);
                 m_ui->internalIDEdit->setText(tr("new"));
                 m_ui->systolicEdit->clear();
                 m_ui->diastolicEdit->clear();

@@ -55,6 +55,9 @@ MainWindow::MainWindow(QWidget *parent)
             case MeasurementModal::AcceptUpdate:
                 m_model->update_measurement(m_measurementModal->measurement());
                 break;
+            case MeasurementModal::AcceptDelete:
+                m_model->delete_measurement(m_measurementModal->measurement().id);
+                break;
         }
     });
 }

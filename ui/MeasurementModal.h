@@ -36,6 +36,7 @@ public:
     {
         AcceptCreate,
         AcceptUpdate,
+        AcceptDelete,
     };
     Q_ENUM(AcceptMode)
 
