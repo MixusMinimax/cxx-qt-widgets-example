@@ -15,7 +15,7 @@
 - [X] double-clicking on graph, not on existing measurement, to add a new
   one
 - [X] modal for editing / creating measurement
-- [ ] allow deleting measurement from modal
+- [X] allow deleting measurement from modal
 - [ ] check datetime in modal for collisions for better feedback
 
 ### model
