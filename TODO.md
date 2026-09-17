@@ -7,6 +7,7 @@
 - [ ] date range presets (today, this week, etc.)
     - [ ] default date range
 - [ ] data export/import with file picker
+- [X] show errors sent back from backend in statusbar
 
 ### control
 
@@ -16,7 +17,6 @@
 - [X] modal for editing / creating measurement
 - [ ] allow deleting measurement from modal
 - [ ] check datetime in modal for collisions for better feedback
-- [ ] deal with errors sent back from backend
 
 ### model
 
@@ -24,7 +24,7 @@
 - [X] rust data model
 - [X] create
 - [X] update
-- [ ] delete
+- [X] delete
 - [X] query all
 - [ ] query range
 - [ ] query daily/weekly/monthly average
