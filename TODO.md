@@ -1,6 +1,7 @@
 ### view
 
 - [X] Value tags on y-axes
+- [ ] date tag on x-axis
 - [X] denser grid
 - [X] measurement preview maybe?
 - [ ] date range presets (today, this week, etc.)
