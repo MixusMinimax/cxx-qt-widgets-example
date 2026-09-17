@@ -1,7 +1,8 @@
-use diesel::{AsChangeset, Connection, Insertable, Queryable, Selectable, SqliteConnection};
-use dotenvy::dotenv;
+use diesel::connection::SimpleConnection;
+use diesel::r2d2::{ConnectionManager, CustomizeConnection, Pool, PooledConnection};
+use diesel::{AsChangeset, Insertable, Queryable, Selectable, SqliteConnection};
+use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 use sql_uuid::Uuid;
-use std::env;
 use tokio::task::spawn_blocking;
 
 #[derive(Queryable, Selectable, Insertable, Clone, PartialEq, Debug, Default)]
@@ -37,8 +38,50 @@ pub enum MeasurementServiceError {
     Diesel(#[from] diesel::result::Error),
 }
 
-#[derive(Debug, Default)]
-pub struct MeasurementService {}
+#[derive(Debug)]
+pub struct MeasurementService {
+    pool: Pool<ConnectionManager<SqliteConnection>>,
+}
+
+impl MeasurementService {
+    const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
+
+    pub fn new(connection_string: impl Into<String>) -> Self {
+        #[derive(Debug)]
+        struct MyCustomizer;
+        impl CustomizeConnection<SqliteConnection, diesel::r2d2::Error> for MyCustomizer {
+            fn on_acquire(&self, conn: &mut SqliteConnection) -> Result<(), diesel::r2d2::Error> {
+                conn.batch_execute("PRAGMA busy_timeout = 2000;")?;
+                // better write-concurrency
+                conn.batch_execute("PRAGMA journal_mode = WAL;")?;
+                // fsync only in critical moments
+                conn.batch_execute("PRAGMA synchronous = NORMAL;")?;
+                // write WAL changes back every 1000 pages, for an in average 1MB WAL file.
+                // May affect readers if number is increased
+                conn.batch_execute("PRAGMA wal_autocheckpoint = 1000;")?;
+                // free some space by truncating possibly massive WAL files from the last run
+                conn.batch_execute("PRAGMA wal_checkpoint(TRUNCATE);")?;
+                Ok(())
+            }
+        }
+
+        let manager = ConnectionManager::<SqliteConnection>::new(connection_string);
+        let pool = Pool::builder()
+            .test_on_check_out(true)
+            .connection_customizer(Box::new(MyCustomizer))
+            .build(manager)
+            .unwrap();
+
+        let mut conn = pool.get().unwrap();
+        conn.run_pending_migrations(Self::MIGRATIONS).unwrap();
+
+        Self { pool }
+    }
+
+    fn establish_connection(&self) -> PooledConnection<ConnectionManager<SqliteConnection>> {
+        self.pool.get().unwrap()
+    }
+}
 
 fn fix_map(m: &mut Measurement) {
     if m.map == 0.0 {
@@ -61,8 +104,9 @@ impl MeasurementService {
         use crate::schema::measurements::dsl::*;
         use diesel::prelude::*;
 
-        let mut results = spawn_blocking(|| {
-            establish_connection().transaction(|connection| {
+        let mut conn = self.establish_connection();
+        let mut results = spawn_blocking(move || {
+            conn.transaction(|connection| {
                 measurements
                     .select(Measurement::as_select())
                     .order_by(timestamp.asc()) // assuming formatted as iso
@@ -90,8 +134,9 @@ impl MeasurementService {
         use crate::schema::measurements::dsl::*;
         use diesel::prelude::*;
 
-        spawn_blocking(|| {
-            establish_connection().transaction(|connection| {
+        let mut conn = self.establish_connection();
+        spawn_blocking(move || {
+            conn.transaction(|connection| {
                 diesel::insert_into(measurements)
                     .values(measurement)
                     .get_result(connection)
@@ -109,8 +154,9 @@ impl MeasurementService {
         use crate::schema::measurements::dsl::*;
         use diesel::prelude::*;
 
-        spawn_blocking(|| {
-            establish_connection().transaction::<_, MeasurementServiceError, _>(|connection| {
+        let mut conn = self.establish_connection();
+        spawn_blocking(move || {
+            conn.transaction::<_, MeasurementServiceError, _>(|connection| {
                 let old_ts = measurements
                     .find(measurement_changeset.id)
                     .select(timestamp)
@@ -131,8 +177,9 @@ impl MeasurementService {
         use crate::schema::measurements::dsl::*;
         use diesel::prelude::*;
 
+        let mut conn = self.establish_connection();
         spawn_blocking(move || {
-            establish_connection().transaction(|connection| {
+            conn.transaction(|connection| {
                 diesel::delete(measurements.find(measurement_id)).get_result(connection)
             })
         })
@@ -142,50 +189,43 @@ impl MeasurementService {
     }
 }
 
-fn establish_connection() -> SqliteConnection {
-    dotenv().ok();
-
-    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    SqliteConnection::establish(&database_url)
-        .unwrap_or_else(|_| panic!("Error connecting to {}", database_url))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use diesel::internal::derives::multiconnection::chrono::{NaiveDate, NaiveDateTime, NaiveTime};
-    use diesel::sqlite::Sqlite;
 
-    #[test]
-    fn test_query() {
+    const M0: Measurement = Measurement {
+        id: Uuid::from_bytes(*b"\x12\x34\x56\x78\x9a\xbc\xde\xf0\x12\x34\x56\x78\x9a\xbc\xde\xf0"),
+        systolic: 123.,
+        diastolic: 85.,
+        map: 99.,
+        pulse: 65.,
+        timestamp: 1789653244.,
+    };
+
+    const CONN_STR: &str = "file:testdb?mode=memory&cache=shared";
+
+    fn setup() -> (MeasurementService, SqliteConnection) {
+        let mut conn = SqliteConnection::establish(CONN_STR).unwrap();
+
         use crate::schema::measurements::dsl::*;
         use diesel::prelude::*;
 
-        let connection = &mut establish_connection();
+        let ms = MeasurementService::new(CONN_STR);
 
-        println!(
-            "{}",
-            diesel::debug_query::<Sqlite, _>(
-                &diesel::insert_into(crate::schema::measurements::table).values(Measurement {
-                    id: Uuid::new_v4(),
-                    timestamp: NaiveDateTime::new(
-                        NaiveDate::from_ymd_opt(2026, 9, 9).unwrap(),
-                        NaiveTime::from_hms_opt(18, 45, 0).unwrap(),
-                    )
-                    .and_utc()
-                    .timestamp() as f64
-                        / 1000.0f64,
-                    ..Default::default()
-                }),
-            )
-        );
+        diesel::insert_into(measurements)
+            .values(M0)
+            .execute(&mut conn)
+            .unwrap();
 
-        let results = measurements
-            .find(Uuid::parse_str("c746b21f-2839-4160-a8eb-70b2c9a7b23c").unwrap())
-            .select(Measurement::as_select())
-            .load(connection)
-            .expect("Error loading measurements");
+        (ms, conn)
+    }
 
-        println!("{:?}", results);
+    #[tokio::test]
+    async fn test_list() {
+        // in-memory database gets deleted if last connection is dropped, so we keep one alive during the test.
+        let (sut, conn) = setup();
+        let v = sut.load_measurements().await.unwrap();
+        assert!(v.contains(&M0));
+        drop(conn);
     }
 }

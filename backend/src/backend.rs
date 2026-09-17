@@ -5,6 +5,7 @@ use crate::domain::measurement::{
 };
 use cxx_qt::{CxxQtType, Threading};
 use cxx_qt_lib::QString;
+use dotenvy::dotenv;
 use sql_uuid::Uuid;
 use static_assertions::{assert_eq_align, assert_eq_size, const_assert_eq};
 use std::cell::OnceCell;
@@ -12,7 +13,7 @@ use std::cmp::Ordering;
 use std::mem::offset_of;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::{mem, slice};
+use std::{env, mem, slice};
 use tokio_util::sync::CancellationToken;
 
 #[cxx_qt::bridge]
@@ -139,11 +140,14 @@ where
 
 impl ffi::MeasurementModel {
     fn initialize(self: Pin<&mut Self>, tokio_handle: Box<AsyncControllerHandle>) {
+        dotenv().ok();
+        let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+
         self.rust_mut()
             .inner
             .set(MeasurementModelRustInner {
                 tokio_handle,
-                measurement_service: Default::default(),
+                measurement_service: Arc::new(MeasurementService::new(database_url)),
                 req_id: Default::default(),
                 measurements: Default::default(),
             })
