@@ -69,6 +69,8 @@ mod ffi {
 
         fn update_measurement(self: Pin<&mut MeasurementModel>, measurement: Measurement) -> u32;
 
+        fn delete_measurement(self: Pin<&mut MeasurementModel>, id: [u8; 16]) -> u32;
+
         fn measurements(self: &MeasurementModel) -> &[Measurement];
 
         #[qsignal]
@@ -230,6 +232,32 @@ impl ffi::MeasurementModel {
                     slice::from_raw_parts(r.as_ptr(), r.len())
                 };
                 backend.measurements_loaded(req_id, measurements);
+            })
+        })
+    }
+
+    fn delete_measurement(self: Pin<&mut Self>, id: [u8; 16]) -> u32 {
+        handle_request(self, async move |_, req_id, measurement_service| {
+            let deleted = measurement_service
+                .delete_measurement(Uuid::from_bytes(id))
+                .await?;
+            let deleted: ffi::Measurement = deleted.into();
+            Ok(move |mut backend: Pin<&mut ffi::MeasurementModel>| {
+                let mut rm = backend.as_mut().rust_mut();
+                let measurements = &mut rm.inner.get_mut().unwrap().measurements;
+                if let Ok(idx) = measurements.binary_search_by(|x| {
+                    x.key.partial_cmp(&deleted.key).unwrap_or(Ordering::Equal)
+                }) {
+                    // expensive. Might consider something else down the line.
+                    measurements.remove(idx);
+                    let measurements = unsafe {
+                        let r = measurements;
+                        slice::from_raw_parts(r.as_ptr(), r.len())
+                    };
+                    backend.measurements_loaded(req_id, measurements);
+                } else {
+                    eprintln!("deleted measurement was not loaded: {:?}", deleted);
+                }
             })
         })
     }

@@ -1,4 +1,3 @@
-use diesel::sqlite::Sqlite;
 use diesel::{AsChangeset, Connection, Insertable, Queryable, Selectable, SqliteConnection};
 use dotenvy::dotenv;
 use sql_uuid::Uuid;
@@ -55,8 +54,10 @@ pub struct MeasurementUpdated {
     pub old_ts: f64,
 }
 
+type MSResult<T> = Result<T, MeasurementServiceError>;
+
 impl MeasurementService {
-    pub async fn load_measurements(&self) -> Result<Vec<Measurement>, MeasurementServiceError> {
+    pub async fn load_measurements(&self) -> MSResult<Vec<Measurement>> {
         use crate::schema::measurements::dsl::*;
         use diesel::prelude::*;
 
@@ -79,7 +80,7 @@ impl MeasurementService {
     pub async fn save_measurement_new(
         &self,
         mut measurement: Measurement,
-    ) -> Result<Measurement, MeasurementServiceError> {
+    ) -> MSResult<Measurement> {
         fix_map(&mut measurement);
         let measurement = Measurement {
             id: Uuid::new_v4(),
@@ -104,7 +105,7 @@ impl MeasurementService {
     pub async fn update_measurement(
         &self,
         measurement_changeset: MeasurementChangeset,
-    ) -> Result<MeasurementUpdated, MeasurementServiceError> {
+    ) -> MSResult<MeasurementUpdated> {
         use crate::schema::measurements::dsl::*;
         use diesel::prelude::*;
 
@@ -125,6 +126,20 @@ impl MeasurementService {
         .await
         .expect("join failed")
     }
+
+    pub async fn delete_measurement(&self, measurement_id: Uuid) -> MSResult<Measurement> {
+        use crate::schema::measurements::dsl::*;
+        use diesel::prelude::*;
+
+        spawn_blocking(move || {
+            establish_connection().transaction(|connection| {
+                diesel::delete(measurements.find(measurement_id)).get_result(connection)
+            })
+        })
+        .await
+        .expect("join failed")
+        .map_err(Into::into)
+    }
 }
 
 fn establish_connection() -> SqliteConnection {
@@ -138,20 +153,19 @@ fn establish_connection() -> SqliteConnection {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use diesel::debug_query;
     use diesel::internal::derives::multiconnection::chrono::{NaiveDate, NaiveDateTime, NaiveTime};
-    use diesel::prelude::*;
     use diesel::sqlite::Sqlite;
 
     #[test]
     fn test_query() {
         use crate::schema::measurements::dsl::*;
+        use diesel::prelude::*;
 
         let connection = &mut establish_connection();
 
         println!(
             "{}",
-            debug_query::<Sqlite, _>(
+            diesel::debug_query::<Sqlite, _>(
                 &diesel::insert_into(crate::schema::measurements::table).values(Measurement {
                     id: Uuid::new_v4(),
                     timestamp: NaiveDateTime::new(
@@ -161,7 +175,7 @@ mod tests {
                     .and_utc()
                     .timestamp() as f64
                         / 1000.0f64,
-                    ..std::default::Default::default()
+                    ..Default::default()
                 }),
             )
         );
