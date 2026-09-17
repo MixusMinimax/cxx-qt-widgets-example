@@ -13,6 +13,12 @@
   <property name="windowTitle">
    <string>MeasurementModal</string>
   </property>
+  <property name="styleSheet">
+   <string notr="true">QLineEdit[readOnly=true] {
+    color: gray;
+    border-color: darkgray;
+}</string>
+  </property>
   <widget class="QDialogButtonBox" name="buttonBox">
    <property name="geometry">
     <rect>
@@ -165,9 +171,6 @@
     </item>
     <item row="0" column="1">
      <widget class="QLineEdit" name="internalIDEdit">
-      <property name="enabled">
-       <bool>true</bool>
-      </property>
       <property name="focusPolicy">
        <enum>Qt::FocusPolicy::ClickFocus</enum>
       </property>

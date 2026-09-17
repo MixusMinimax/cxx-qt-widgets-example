@@ -530,12 +530,12 @@ void BloodPressureGraph::setModel(MeasurementModel *model)
     }
     m_model = model;
     if (m_model) {
-        const auto req_id = m_model->load_measurements();
+        m_model->load_measurements();
         m_modelConnections = {connect(
             m_model,
             &MeasurementModel::measurements_loaded,
-            [this, req_id](const uint32_t id, const ::rust::Slice<const measurement> measurements) {
-                auto debug = qDebug().nospace() << "req id: " << req_id << "(" << id << "), measurements: [";
+            [this](const uint32_t id, const ::rust::Slice<const measurement> measurements) {
+                auto debug = qDebug().nospace() << "req id: " << id << ", measurements: [";
                 std::ranges::for_each(measurements, [&debug](const measurement &m) {
                     debug = debug << "{s:" << m.systolic << ", d:" << m.diastolic << "},";
                 });

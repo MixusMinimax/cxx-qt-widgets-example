@@ -39,7 +39,7 @@ private slots:
 private:
     measurements::MeasurementModel *m_model{nullptr};
     MeasurementModal *m_measurementModal;
-    std::array<QMetaObject::Connection, 0> m_modelConnections{};
+    std::array<QMetaObject::Connection, 1> m_modelConnections{};
     std::unique_ptr<Ui::MainWindow> m_ui;
 };
 

@@ -71,7 +71,12 @@ void MainWindow::setModel(measurements::MeasurementModel *model)
     m_model = model;
     if (m_model) {
         m_modelConnections = {
-            // todo
+            connect(
+                m_model, &measurements::MeasurementModel::failure, [this](const uint32_t req_id, const QString &msg) {
+                    qDebug() << QString{"%1: %2"}.arg(req_id).arg(msg);
+                    statusBar()->showMessage(QString{"%1: %2"}.arg(req_id).arg(msg));
+                }
+            ),
         };
     } else {
         m_modelConnections = {};

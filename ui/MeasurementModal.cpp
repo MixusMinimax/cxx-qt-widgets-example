@@ -14,6 +14,7 @@
 #include "qcustomplot.h"
 #include "util.h"
 
+static QDateTime roundToMinute(const QDateTime &dt);
 
 MeasurementModal::MeasurementModal(QWidget *parent) : QDialog{parent}, m_ui{std::make_unique<Ui::MeasurementModal>()}
 {
@@ -55,7 +56,7 @@ void MeasurementModal::initialize(const initialize_opts &opts)
                 initialize(m_ui->diastolicEdit, measurement.diastolic);
                 initialize(m_ui->mapEdit, measurement.map);
                 initialize(m_ui->pulseEdit, measurement.pulse);
-                m_ui->dateTimeEdit->setDateTime(QCPAxisTickerDateTime::keyToDateTime(measurement.key));
+                m_ui->dateTimeEdit->setDateTime(roundToMinute(QCPAxisTickerDateTime::keyToDateTime(measurement.key)));
             },
             [&, this](const QDateTime &date_time) {
                 m_acceptMode = AcceptCreate;
@@ -65,7 +66,7 @@ void MeasurementModal::initialize(const initialize_opts &opts)
                 m_ui->diastolicEdit->clear();
                 m_ui->mapEdit->clear();
                 m_ui->pulseEdit->clear();
-                m_ui->dateTimeEdit->setDateTime(date_time);
+                m_ui->dateTimeEdit->setDateTime(roundToMinute(date_time));
             }
         },
         opts
@@ -83,7 +84,7 @@ measurements::measurement MeasurementModal::measurement() const
         .diastolic = static_cast<double>(m_ui->diastolicEdit->value()),
         .map = static_cast<double>(m_ui->mapEdit->hasAcceptableInput() ? m_ui->mapEdit->value() : 0),
         .pulse = static_cast<double>(m_ui->pulseEdit->value()),
-        .key = QCPAxisTickerDateTime::dateTimeToKey(m_ui->dateTimeEdit->dateTime())
+        .key = QCPAxisTickerDateTime::dateTimeToKey(roundToMinute(m_ui->dateTimeEdit->dateTime())),
     };
 }
 
@@ -107,4 +108,10 @@ void MeasurementModal::accept()
     if (validate()) {
         QDialog::accept();
     }
+}
+
+QDateTime roundToMinute(const QDateTime &dt)
+{
+    const auto t = dt.time().addSecs(30);
+    return QDateTime{dt.date(), QTime{t.hour(), t.minute(), 0}};
 }
