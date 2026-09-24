@@ -1,21 +1,26 @@
 use diesel::connection::SimpleConnection;
-use diesel::r2d2::{ConnectionManager, CustomizeConnection, Pool, PooledConnection};
+use diesel::r2d2::{ConnectionManager, CustomizeConnection, Pool};
 use diesel::{AsChangeset, Insertable, Queryable, Selectable, SqliteConnection};
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
+use serde::{Deserialize, Serialize};
 use sql_uuid::Uuid;
 use tokio::task::spawn_blocking;
 
-#[derive(Queryable, Selectable, Insertable, Clone, PartialEq, Debug, Default)]
+#[derive(
+    Queryable, Selectable, Insertable, Clone, PartialEq, Debug, Default, Serialize, Deserialize,
+)]
 #[diesel(table_name = crate::schema::measurements)]
 #[diesel(primary_key(id))]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 #[repr(C)]
 pub struct Measurement {
+    #[serde(serialize_with = "ser::ser_uuid", deserialize_with = "ser::de_uuid")]
     pub id: Uuid,
     pub systolic: f64,
     pub diastolic: f64,
     pub map: f64,
     pub pulse: f64,
+    #[serde(serialize_with = "ser::ser_ts", deserialize_with = "ser::de_ts")]
     pub timestamp: f64,
 }
 
@@ -32,10 +37,14 @@ pub struct MeasurementChangeset {
     pub timestamp: Option<f64>,
 }
 
-#[derive(Debug, PartialEq, thiserror::Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum MeasurementServiceError {
     #[error("diesel error: {0}")]
     Diesel(#[from] diesel::result::Error),
+    #[error("csv error: {0}")]
+    Csv(#[from] csv::Error),
+    #[error("io error: {0}")]
+    Io(#[from] std::io::Error),
 }
 
 #[derive(Debug)]
@@ -77,10 +86,6 @@ impl MeasurementService {
 
         Self { pool }
     }
-
-    fn establish_connection(&self) -> PooledConnection<ConnectionManager<SqliteConnection>> {
-        self.pool.get().unwrap()
-    }
 }
 
 fn fix_map(m: &mut Measurement) {
@@ -104,9 +109,9 @@ impl MeasurementService {
         use crate::schema::measurements::dsl::*;
         use diesel::prelude::*;
 
-        let mut conn = self.establish_connection();
+        let pool = self.pool.clone();
         let mut results = spawn_blocking(move || {
-            conn.transaction(|connection| {
+            pool.get().unwrap().transaction(|connection| {
                 measurements
                     .select(Measurement::as_select())
                     .order_by(timestamp.asc()) // assuming formatted as iso
@@ -134,9 +139,9 @@ impl MeasurementService {
         use crate::schema::measurements::dsl::*;
         use diesel::prelude::*;
 
-        let mut conn = self.establish_connection();
+        let pool = self.pool.clone();
         spawn_blocking(move || {
-            conn.transaction(|connection| {
+            pool.get().unwrap().transaction(|connection| {
                 diesel::insert_into(measurements)
                     .values(measurement)
                     .get_result(connection)
@@ -154,20 +159,22 @@ impl MeasurementService {
         use crate::schema::measurements::dsl::*;
         use diesel::prelude::*;
 
-        let mut conn = self.establish_connection();
+        let pool = self.pool.clone();
         spawn_blocking(move || {
-            conn.transaction::<_, MeasurementServiceError, _>(|connection| {
-                let old_ts = measurements
-                    .find(measurement_changeset.id)
-                    .select(timestamp)
-                    .get_result(connection)?;
+            pool.get()
+                .unwrap()
+                .transaction::<_, MeasurementServiceError, _>(|connection| {
+                    let old_ts = measurements
+                        .find(measurement_changeset.id)
+                        .select(timestamp)
+                        .get_result(connection)?;
 
-                let new = diesel::update(measurements.find(measurement_changeset.id))
-                    .set(measurement_changeset)
-                    .get_result(connection)?;
+                    let new = diesel::update(measurements.find(measurement_changeset.id))
+                        .set(measurement_changeset)
+                        .get_result(connection)?;
 
-                Ok(MeasurementUpdated { new, old_ts })
-            })
+                    Ok(MeasurementUpdated { new, old_ts })
+                })
         })
         .await
         .expect("join failed")
@@ -177,15 +184,105 @@ impl MeasurementService {
         use crate::schema::measurements::dsl::*;
         use diesel::prelude::*;
 
-        let mut conn = self.establish_connection();
+        let pool = self.pool.clone();
         spawn_blocking(move || {
-            conn.transaction(|connection| {
+            pool.get().unwrap().transaction(|connection| {
                 diesel::delete(measurements.find(measurement_id)).get_result(connection)
             })
         })
         .await
         .expect("join failed")
         .map_err(Into::into)
+    }
+
+    pub async fn export_measurements<W: std::io::Write + Send + 'static>(
+        &self,
+        wtr: W,
+    ) -> MSResult<W> {
+        use crate::schema::measurements::dsl::*;
+        use diesel::prelude::*;
+
+        let pool = self.pool.clone();
+        spawn_blocking(move || {
+            pool.get().unwrap().transaction(|connection| {
+                let mut wtr = csv::WriterBuilder::new()
+                    .has_headers(true)
+                    .delimiter(b';')
+                    .from_writer(wtr);
+
+                for m @ Measurement { .. } in measurements.load(connection)? {
+                    wtr.serialize(m)?;
+                }
+
+                wtr.flush()?;
+
+                Ok(wtr.into_inner().unwrap())
+            })
+        })
+        .await
+        .expect("join failed")
+    }
+}
+
+mod ser {
+    use chrono::{DateTime, SecondsFormat, Utc};
+    use serde::de::{Unexpected, Visitor};
+    use serde::{Deserializer, Serializer};
+    use sql_uuid::Uuid;
+    use std::fmt::Formatter;
+    use std::str::FromStr;
+
+    pub fn ser_uuid<S: Serializer>(uuid: &Uuid, s: S) -> Result<S::Ok, S::Error> {
+        s.collect_str(uuid.0.as_hyphenated())
+    }
+
+    pub fn de_uuid<'de, D: Deserializer<'de>>(d: D) -> Result<Uuid, D::Error> {
+        struct V;
+        impl<'de2> Visitor<'de2> for V {
+            type Value = Uuid;
+
+            fn expecting(&self, f: &mut Formatter) -> std::fmt::Result {
+                write!(f, "a uuid string")
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Uuid::parse_str(v).map_err(|_| E::invalid_value(Unexpected::Str(v), &self))
+            }
+        }
+
+        d.deserialize_str(V)
+    }
+
+    pub fn ser_ts<S: Serializer>(timestamp: &f64, s: S) -> Result<S::Ok, S::Error> {
+        let x = DateTime::from_timestamp_millis(*timestamp as i64)
+            .ok_or_else(|| <S::Error as serde::ser::Error>::custom("invalid timestamp"))?;
+        s.collect_str(&x.to_rfc3339_opts(SecondsFormat::Secs, true))
+    }
+
+    pub fn de_ts<'de, D: Deserializer<'de>>(d: D) -> Result<f64, D::Error> {
+        struct V;
+
+        impl<'de2> Visitor<'de2> for V {
+            type Value = f64;
+
+            fn expecting(&self, f: &mut Formatter) -> std::fmt::Result {
+                write!(f, "an rfc 3339 datetime")
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                DateTime::<Utc>::from_str(v)
+                    .map(|dt| dt.timestamp_millis() as f64 / 1000.)
+                    .map_err(|_| E::invalid_value(Unexpected::Str(v), &self))
+            }
+        }
+
+        d.deserialize_str(V)
     }
 }
 

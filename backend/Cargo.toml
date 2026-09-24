@@ -10,12 +10,15 @@ members = ["sql-uuid"]
 crate-type = ["staticlib"]
 
 [dependencies]
+chrono = "0.4"
+csv = "1.4"
 cxx = "1"
 cxx-qt = "0.10"
 cxx-qt-lib = { version = "0.10" }
 diesel = { version = "2,<2.3.8", features = ["sqlite", "returning_clauses_for_sqlite_3_35", "uuid", "chrono", "r2d2"] }
 diesel_migrations = { version = "2,<2.3.8", features = ["sqlite"] }
 dotenvy = "0.15"
+serde = { version = "1", features = ["derive"] }
 static_assertions = "1.1.0"
 sql-uuid = { path = "sql-uuid", features = ["v4"] }
 thiserror = "2"

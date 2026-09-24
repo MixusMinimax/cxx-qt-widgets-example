@@ -44,19 +44,13 @@ impl fmt::Display for Uuid {
 
 impl fmt::LowerHex for Uuid {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for b in self.0.as_bytes() {
-            write!(f, "{:02x}", b)?;
-        }
-        Ok(())
+        fmt::LowerHex::fmt(&self.0, f)
     }
 }
 
 impl fmt::UpperHex for Uuid {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for b in self.0.as_bytes() {
-            write!(f, "{:02X}", b)?;
-        }
-        Ok(())
+        fmt::UpperHex::fmt(&self.0, f)
     }
 }
 
@@ -100,7 +94,7 @@ mod tests {
 
     #[test]
     fn print_id_blob() {
-        let id = Uuid::new_v4();
+        let id = Uuid::new_v4().0.simple();
         println!("{:X}", id);
     }
 }

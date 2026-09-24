@@ -93,10 +93,14 @@ void MainWindow::newProject() const
     statusBar()->showMessage(tr("newProject"));
 }
 
-void MainWindow::open() const
+void MainWindow::open()
 {
     qDebug() << "MainWindow::open()";
     statusBar()->showMessage(tr("open"));
+    const auto file = QFileDialog::getOpenFileUrl(
+        this, tr("Import CSV"), QUrl::fromLocalFile(QDir::homePath()), tr("CSV files (*.csv)")
+    );
+    qDebug() << "import file:" << file.toString();
 }
 
 void MainWindow::save() const

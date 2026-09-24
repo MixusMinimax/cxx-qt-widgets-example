@@ -30,7 +30,7 @@ public:
 
 private slots:
     void newProject() const;
-    void open() const;
+    void open();
     void save() const;
     void save_as() const;
     void quit();

@@ -101,7 +101,7 @@ struct MeasurementModelRustInner {
     measurements: Vec<ffi::Measurement>,
 }
 
-#[derive(Debug, PartialEq, thiserror::Error)]
+#[derive(Debug, thiserror::Error)]
 enum HandlerError {
     #[error("MeasurementServiceError: {0}")]
     MeasurementServiceError(#[from] MeasurementServiceError),
