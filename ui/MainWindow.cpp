@@ -48,6 +48,7 @@ MainWindow::MainWindow(QWidget *parent)
     });
 
     connect(m_measurementModal, &MeasurementModal::accepted, [this] {
+        if (!m_model) return;
         switch (m_measurementModal->acceptMode()) {
             case MeasurementModal::AcceptCreate:
                 m_model->create_measurement(m_measurementModal->measurement());
@@ -109,10 +110,20 @@ void MainWindow::save() const
     statusBar()->showMessage(tr("save"));
 }
 
-void MainWindow::save_as() const
+void MainWindow::save_as()
 {
     qDebug() << "MainWindow::save_as()";
     statusBar()->showMessage(tr("save_as"));
+    auto name = QDateTime::currentDateTime().toString("yyyy-MM-ddThh:mm");
+    name.append(".csv");
+    const auto file = QFileDialog::getSaveFileUrl(
+        this, tr("Export CSV"), QUrl::fromLocalFile(QDir::home().filePath(name)), tr("CSV files (*.csv)")
+    );
+    if (!m_model) {
+        qDebug() << "MainWindow::save_as: m_model was null";
+        return;
+    }
+    m_model->export_measurements(file.toString().toStdString());
 }
 
 void MainWindow::quit()

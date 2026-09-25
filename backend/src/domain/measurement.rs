@@ -2,25 +2,22 @@ use diesel::connection::SimpleConnection;
 use diesel::r2d2::{ConnectionManager, CustomizeConnection, Pool};
 use diesel::{AsChangeset, Insertable, Queryable, Selectable, SqliteConnection};
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
-use serde::{Deserialize, Serialize};
 use sql_uuid::Uuid;
+use std::convert::Infallible;
+use std::num::NonZeroU8;
 use tokio::task::spawn_blocking;
 
-#[derive(
-    Queryable, Selectable, Insertable, Clone, PartialEq, Debug, Default, Serialize, Deserialize,
-)]
+#[derive(Queryable, Selectable, Insertable, Clone, PartialEq, Debug, Default)]
 #[diesel(table_name = crate::schema::measurements)]
 #[diesel(primary_key(id))]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 #[repr(C)]
 pub struct Measurement {
-    #[serde(serialize_with = "ser::ser_uuid", deserialize_with = "ser::de_uuid")]
     pub id: Uuid,
     pub systolic: f64,
     pub diastolic: f64,
     pub map: f64,
     pub pulse: f64,
-    #[serde(serialize_with = "ser::ser_ts", deserialize_with = "ser::de_ts")]
     pub timestamp: f64,
 }
 
@@ -45,6 +42,26 @@ pub enum MeasurementServiceError {
     Csv(#[from] csv::Error),
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
+    #[error("export error: {0}")]
+    Export(#[from] ExportError),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ExportError {
+    #[error("diesel error: {0}")]
+    Diesel(#[from] diesel::result::Error),
+    #[error("csv error: {0}")]
+    Csv(#[from] csv::Error),
+    #[error("io error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("invalid timestamp")]
+    InvalidTimestamp(f64),
+}
+
+impl From<Infallible> for ExportError {
+    fn from(_: Infallible) -> Self {
+        unreachable!()
+    }
 }
 
 #[derive(Debug)]
@@ -101,6 +118,27 @@ pub struct MeasurementUpdated {
     pub new: Measurement,
     pub old_ts: f64,
 }
+
+#[derive(Clone, Eq, PartialEq, Debug, Default)]
+pub struct ExportOptions {
+    pub export_id: bool,
+    pub export_map: bool,
+    pub delimiter: Option<NonZeroU8>,
+    pub columns: Columns,
+}
+
+#[derive(Clone, Eq, PartialEq, Debug, Default)]
+pub struct Columns {
+    pub id: Option<String>,
+    pub systolic: Option<String>,
+    pub diastolic: Option<String>,
+    pub map: Option<String>,
+    pub pulse: Option<String>,
+    pub date_time: Option<String>,
+}
+
+#[derive(Clone, Eq, PartialEq, Debug, Default)]
+pub struct ImportOptions {}
 
 type MSResult<T> = Result<T, MeasurementServiceError>;
 
@@ -198,26 +236,22 @@ impl MeasurementService {
     pub async fn export_measurements<W: std::io::Write + Send + 'static>(
         &self,
         wtr: W,
+        opts: ExportOptions,
     ) -> MSResult<W> {
         use crate::schema::measurements::dsl::*;
         use diesel::prelude::*;
 
         let pool = self.pool.clone();
         spawn_blocking(move || {
-            pool.get().unwrap().transaction(|connection| {
-                let mut wtr = csv::WriterBuilder::new()
-                    .has_headers(true)
-                    .delimiter(b';')
-                    .from_writer(wtr);
-
-                for m @ Measurement { .. } in measurements.load(connection)? {
-                    wtr.serialize(m)?;
-                }
-
-                wtr.flush()?;
-
-                Ok(wtr.into_inner().unwrap())
-            })
+            pool.get()
+                .unwrap()
+                .transaction::<_, MeasurementServiceError, _>(|connection| {
+                    Ok(ser::write_csv(
+                        measurements.load_iter(connection)?,
+                        wtr,
+                        opts,
+                    )?)
+                })
         })
         .await
         .expect("join failed")
@@ -225,16 +259,14 @@ impl MeasurementService {
 }
 
 mod ser {
+    use super::{ExportError, ExportOptions, Measurement};
     use chrono::{DateTime, SecondsFormat, Utc};
+    use serde::Deserializer;
     use serde::de::{Unexpected, Visitor};
-    use serde::{Deserializer, Serializer};
     use sql_uuid::Uuid;
     use std::fmt::Formatter;
+    use std::io::{Read, Write};
     use std::str::FromStr;
-
-    pub fn ser_uuid<S: Serializer>(uuid: &Uuid, s: S) -> Result<S::Ok, S::Error> {
-        s.collect_str(uuid.0.as_hyphenated())
-    }
 
     pub fn de_uuid<'de, D: Deserializer<'de>>(d: D) -> Result<Uuid, D::Error> {
         struct V;
@@ -256,12 +288,6 @@ mod ser {
         d.deserialize_str(V)
     }
 
-    pub fn ser_ts<S: Serializer>(timestamp: &f64, s: S) -> Result<S::Ok, S::Error> {
-        let x = DateTime::from_timestamp_millis(*timestamp as i64)
-            .ok_or_else(|| <S::Error as serde::ser::Error>::custom("invalid timestamp"))?;
-        s.collect_str(&x.to_rfc3339_opts(SecondsFormat::Secs, true))
-    }
-
     pub fn de_ts<'de, D: Deserializer<'de>>(d: D) -> Result<f64, D::Error> {
         struct V;
 
@@ -277,12 +303,138 @@ mod ser {
                 E: serde::de::Error,
             {
                 DateTime::<Utc>::from_str(v)
-                    .map(|dt| dt.timestamp_millis() as f64 / 1000.)
+                    .map(|dt| dt.timestamp() as f64)
                     .map_err(|_| E::invalid_value(Unexpected::Str(v), &self))
             }
         }
 
         d.deserialize_str(V)
+    }
+
+    pub fn write_csv<
+        E: std::error::Error,
+        I: IntoIterator<Item = Result<Measurement, E>>,
+        W: Write,
+    >(
+        measurements: I,
+        wtr: W,
+        ExportOptions {
+            export_id,
+            export_map,
+            delimiter,
+            columns,
+        }: ExportOptions,
+    ) -> Result<W, ExportError>
+    where
+        ExportError: From<E>,
+    {
+        let mut wtr = csv::WriterBuilder::new()
+            .delimiter(delimiter.map(Into::into).unwrap_or(b';'))
+            .from_writer(wtr);
+
+        // write header
+        if export_id {
+            wtr.write_field(columns.id.as_deref().unwrap_or(columns::ID))?;
+        }
+        wtr.write_field(columns.systolic.as_deref().unwrap_or(columns::SYSTOLIC))?;
+        wtr.write_field(columns.diastolic.as_deref().unwrap_or(columns::DIASTOLIC))?;
+        if export_map {
+            wtr.write_field(columns.map.as_deref().unwrap_or(columns::MAP))?;
+        }
+        wtr.write_field(columns.pulse.as_deref().unwrap_or(columns::PULSE))?;
+        wtr.write_field(columns.date_time.as_deref().unwrap_or(columns::DATE_TIME))?;
+        wtr.write_record(None::<&[u8]>)?;
+
+        let mut buf = Vec::<u8>::new();
+
+        for res in measurements {
+            let Measurement {
+                id,
+                systolic,
+                diastolic,
+                map,
+                pulse,
+                timestamp,
+            } = res?;
+            if export_id {
+                buf.clear();
+                write!(&mut buf, "{}", id.0.as_hyphenated())?;
+                wtr.write_field(&buf)?;
+            }
+            buf.clear();
+            write!(&mut buf, "{}", systolic)?;
+            wtr.write_field(&buf)?;
+            buf.clear();
+            write!(&mut buf, "{}", diastolic)?;
+            wtr.write_field(&buf)?;
+            if export_map {
+                buf.clear();
+                write!(&mut buf, "{}", map)?;
+                wtr.write_field(&buf)?;
+            }
+            buf.clear();
+            write!(&mut buf, "{}", pulse)?;
+            wtr.write_field(&buf)?;
+
+            let date_time = DateTime::from_timestamp_secs(timestamp as i64)
+                .ok_or_else(|| ExportError::InvalidTimestamp(timestamp))?;
+            wtr.write_field(date_time.to_rfc3339_opts(SecondsFormat::Secs, true))?;
+
+            wtr.write_record(None::<&[u8]>)?;
+        }
+
+        wtr.flush()?;
+
+        Ok(wtr.into_inner().unwrap())
+    }
+
+    pub fn read_csv<R: Read>(rdr: R) {
+        todo!()
+    }
+
+    mod columns {
+        pub const ID: &str = "ID";
+        pub const SYSTOLIC: &str = "Systolic";
+        pub const DIASTOLIC: &str = "Diastolic";
+        pub const MAP: &str = "Map";
+        pub const PULSE: &str = "Pulse";
+        pub const DATE_TIME: &str = "Time";
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use std::convert::Infallible;
+
+        #[test]
+        fn test_write_csv() {
+            let mut buf = Vec::<u8>::new();
+
+            let it = write_csv(
+                [Ok::<Measurement, Infallible>(Measurement {
+                    systolic: 123.,
+                    diastolic: 88.,
+                    timestamp: (5 * 24 * 60 * 60) as f64,
+                    ..Measurement::default()
+                })],
+                &mut buf,
+                ExportOptions {
+                    export_id: false,
+                    export_map: false,
+                    ..ExportOptions::default()
+                },
+            );
+
+            assert!(it.is_ok());
+            let it = it.unwrap();
+
+            // This would be a place to use std::bstr::ByteStr::new() once it's stable
+            assert_eq!(
+                unsafe { str::from_utf8_unchecked(it) },
+                "Systolic;Diastolic;Pulse;Time\n\
+                 123;88;0;1970-01-06T00:00:00Z\n",
+            );
+        }
     }
 }
 

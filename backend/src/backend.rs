@@ -1,6 +1,6 @@
 use crate::controller::AsyncControllerHandle;
 use crate::domain::measurement::{
-    Measurement, MeasurementChangeset, MeasurementService, MeasurementServiceError,
+    ExportOptions, Measurement, MeasurementChangeset, MeasurementService, MeasurementServiceError,
     MeasurementUpdated,
 };
 use cxx_qt::{CxxQtType, Threading};
@@ -10,11 +10,14 @@ use sql_uuid::Uuid;
 use static_assertions::{assert_eq_align, assert_eq_size, const_assert_eq};
 use std::cell::OnceCell;
 use std::cmp::Ordering;
+use std::fs::{File, OpenOptions, create_dir_all};
+use std::io::Write;
 use std::mem::offset_of;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::{env, mem, slice};
 use tokio_util::sync::CancellationToken;
+use url::Url;
 
 #[cxx_qt::bridge]
 mod ffi {
@@ -72,6 +75,8 @@ mod ffi {
 
         fn delete_measurement(self: Pin<&mut MeasurementModel>, id: [u8; 16]) -> u32;
 
+        fn export_measurements(self: Pin<&mut MeasurementModel>, url: String) -> u32;
+
         fn measurements(self: &MeasurementModel) -> &[Measurement];
 
         #[qsignal]
@@ -105,6 +110,24 @@ struct MeasurementModelRustInner {
 enum HandlerError {
     #[error("MeasurementServiceError: {0}")]
     MeasurementServiceError(#[from] MeasurementServiceError),
+    #[error("io error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("invalid Url: {0}")]
+    InvalidUrl(#[from] UrlError),
+}
+
+#[derive(Debug, thiserror::Error)]
+enum UrlError {
+    #[error("{0}")]
+    Parse(#[from] url::ParseError),
+    #[error("unsupported scheme: {0}")]
+    UnsupportedScheme(String),
+    #[error("invalid host: {0}")]
+    InvalidHost(String),
+    #[error("path already exists and is not a file")]
+    AlreadyExists,
+    #[error("io error: {0}")]
+    Io(#[from] std::io::Error),
 }
 
 fn handle_request<F, O, RF>(mut m: Pin<&mut ffi::MeasurementModel>, handler: F) -> u32
@@ -263,6 +286,41 @@ impl ffi::MeasurementModel {
                     eprintln!("deleted measurement was not loaded: {:?}", deleted);
                 }
             })
+        })
+    }
+
+    fn export_measurements(self: Pin<&mut Self>, url: String) -> u32 {
+        eprintln!("doing the thing");
+        handle_request(self, async move |_, _, measurement_service| {
+            let (file, path) = (|| -> Result<_, UrlError> {
+                let url = Url::parse(&url)?;
+                if url.scheme() != "file" {
+                    return Err(UrlError::UnsupportedScheme(url.scheme().to_string()));
+                }
+                let path = url.to_file_path().map_err(|()| {
+                    UrlError::InvalidHost(url.host_str().unwrap_or("<missing>").to_string())
+                })?;
+                let valid = !path.exists() || path.is_file();
+                if !valid {
+                    return Err(UrlError::AlreadyExists);
+                }
+                if let Some(parent) = path.parent()
+                    && !parent.exists()
+                {
+                    create_dir_all(parent)?;
+                }
+                Ok((File::create(&path)?, path))
+            })()?;
+            let mut file = measurement_service
+                .export_measurements(
+                    file,
+                    ExportOptions {
+                        ..ExportOptions::default()
+                    },
+                )
+                .await?;
+            file.flush()?;
+            Ok(move |_: Pin<&mut ffi::MeasurementModel>| {})
         })
     }
 
