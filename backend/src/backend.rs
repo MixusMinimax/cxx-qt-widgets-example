@@ -22,8 +22,14 @@ use url::Url;
 #[cxx_qt::bridge]
 mod ffi {
     unsafe extern "C++" {
+        // workaround because cxx-qt's qstring.h file does not include it, and
+        // qt itself references QChar in some places where the type is not
+        // complete yet. Usually, you don't notice, as c++ headers can be
+        // included from other places and QChar is usually complete.
+        // specifically qarray has some static_assertions that require QChar to
+        // be complete.
+        include!(<QtCore/QChar>);
         include!("cxx-qt-lib/qstring.h");
-        include!("cxx-qt-lib/qdatetime.h");
 
         type QString = cxx_qt_lib::QString;
     }
@@ -229,7 +235,8 @@ impl ffi::MeasurementModel {
                 let mut rm = backend.as_mut().rust_mut();
                 let measurements = &mut rm.inner.get_mut().unwrap().measurements;
                 let idx = measurements.partition_point(|x| x.key < new.key);
-                // PartialOrd vs Ord is not relevant because nothing is NAN or infinity.
+                // PartialOrd vs Ord is not relevant because nothing is NAN or
+                // infinity.
 
                 if new.key != old_ts
                     && let Ok(old_idx) = if old_ts < new.key {

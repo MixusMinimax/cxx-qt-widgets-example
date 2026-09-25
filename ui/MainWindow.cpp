@@ -8,6 +8,8 @@
 #include <QWidget>
 #include <backend/src/backend.cxxqt.h>
 
+#include <QtCore/qchar.h>
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow{parent}, m_measurementModal{new MeasurementModal{this}}, m_ui{std::make_unique<Ui::MainWindow>()}
 {
