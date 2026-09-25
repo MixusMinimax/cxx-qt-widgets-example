@@ -1,11 +1,8 @@
+use diesel::backend::Backend;
 use diesel::deserialize::FromSql;
-use diesel::{
-    AsExpression, FromSqlRow,
-    backend::Backend,
-    deserialize,
-    serialize::{self, Output, ToSql},
-    sql_types::Binary,
-};
+use diesel::serialize::{self, Output, ToSql};
+use diesel::sql_types::Binary;
+use diesel::{AsExpression, FromSqlRow, deserialize};
 use std::fmt;
 use uuid::Bytes;
 

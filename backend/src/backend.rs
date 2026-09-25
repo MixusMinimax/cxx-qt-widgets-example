@@ -10,7 +10,7 @@ use sql_uuid::Uuid;
 use static_assertions::{assert_eq_align, assert_eq_size, const_assert_eq};
 use std::cell::OnceCell;
 use std::cmp::Ordering;
-use std::fs::{File, OpenOptions, create_dir_all};
+use std::fs::{File, create_dir_all};
 use std::io::Write;
 use std::mem::offset_of;
 use std::pin::Pin;
