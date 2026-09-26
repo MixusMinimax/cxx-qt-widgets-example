@@ -18,8 +18,10 @@
 - [ ] check datetime in modal for collisions for better feedback
 - [X] data export file picker
   - [ ] data export settings modal
-- [ ] data import file picker
+  - [X] data export remember folder
+- [X] data import file picker
   - [ ] data import settings modal
+  - [X] data import remember folder
 
 ### model
 
@@ -32,9 +34,9 @@
 - [ ] query range
 - [ ] query daily/weekly/monthly average
 - [X] export csv
-  - [ ] accept settings
+  - [ ] settings (delimiter, etc.)
 - [X] import csv
-  - [ ] accept settings
+  - [ ] settings (delimiter, etc.)
   - on id collisions, replace old row
   - on timestamp collisions, either:
     - keep old row
