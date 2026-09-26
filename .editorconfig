@@ -7,3 +7,4 @@ insert_final_newline = true
 
 [*.md]
 max_line_length = 75
+indent_size = 2

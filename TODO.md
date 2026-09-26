@@ -5,8 +5,7 @@
 - [X] denser grid
 - [X] measurement preview maybe?
 - [ ] date range presets (today, this week, etc.)
-    - [ ] default date range
-- [ ] data export/import with file picker
+  - [ ] default date range
 - [X] show errors sent back from backend in statusbar
 
 ### control
@@ -17,6 +16,8 @@
 - [X] modal for editing / creating measurement
 - [X] allow deleting measurement from modal
 - [ ] check datetime in modal for collisions for better feedback
+- [X] data export file picker
+- [ ] data import file picker
 
 ### model
 
@@ -28,5 +29,13 @@
 - [X] query all
 - [ ] query range
 - [ ] query daily/weekly/monthly average
-- [ ] export csv
+- [X] export csv
 - [ ] import csv
+  - if id is supplied, update those measurements
+    - in case of TS collision, fail
+    - in case of TS collision, warn (setting)
+  - if id is not supplied, timestamp is identifying
+    - in case of TS collision, replace existing measurement
+    - in case of TS collision, warn and keep old (setting)
+  - everything in one transaction
+- [ ] undo/redo (audited database?)
