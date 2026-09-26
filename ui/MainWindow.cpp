@@ -104,12 +104,18 @@ void MainWindow::open()
         this, tr("Import CSV"), QUrl::fromLocalFile(QDir::homePath()), tr("CSV files (*.csv)")
     );
     qDebug() << "import file:" << file.toString();
+    if (!m_model) {
+        qDebug() << "MainWindow::open: m_model was null";
+        return;
+    }
+    m_model->import_measurements(file.toString().toStdString());
 }
 
-void MainWindow::save() const
+void MainWindow::save()
 {
     qDebug() << "MainWindow::save()";
     statusBar()->showMessage(tr("save"));
+    save_as(); // for now, later we will probably bind this to C-e (export)
 }
 
 void MainWindow::save_as()

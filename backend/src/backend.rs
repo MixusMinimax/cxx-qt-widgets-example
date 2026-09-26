@@ -1,7 +1,7 @@
 use crate::controller::AsyncControllerHandle;
 use crate::domain::measurement::{
-    ExportOptions, Measurement, MeasurementChangeset, MeasurementService, MeasurementServiceError,
-    MeasurementUpdated,
+    ExportOptions, ImportOptions, Measurement, MeasurementChangeset, MeasurementService,
+    MeasurementServiceError, MeasurementUpdated,
 };
 use cxx_qt::{CxxQtType, Threading};
 use cxx_qt_lib::QString;
@@ -13,6 +13,7 @@ use std::cmp::Ordering;
 use std::fs::{File, create_dir_all};
 use std::io::Write;
 use std::mem::offset_of;
+use std::num::{NonZero, NonZeroU8};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::{env, mem, slice};
@@ -83,6 +84,8 @@ mod ffi {
 
         fn export_measurements(self: Pin<&mut MeasurementModel>, url: String) -> u32;
 
+        fn import_measurements(self: Pin<&mut MeasurementModel>, url: String) -> u32;
+
         fn measurements(self: &MeasurementModel) -> &[Measurement];
 
         #[qsignal]
@@ -132,6 +135,8 @@ enum UrlError {
     InvalidHost(String),
     #[error("path already exists and is not a file")]
     AlreadyExists,
+    #[error("file does not exist")]
+    NotFound,
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
 }
@@ -297,7 +302,6 @@ impl ffi::MeasurementModel {
     }
 
     fn export_measurements(self: Pin<&mut Self>, url: String) -> u32 {
-        eprintln!("doing the thing");
         handle_request(self, async move |_, _, measurement_service| {
             let (file, path) = (|| -> Result<_, UrlError> {
                 let url = Url::parse(&url)?;
@@ -327,7 +331,41 @@ impl ffi::MeasurementModel {
                 )
                 .await?;
             file.flush()?;
+            // todo notify frontend of progress along the way for progress bar,
+            //      or at least the fact it finished
             Ok(move |_: Pin<&mut ffi::MeasurementModel>| {})
+        })
+    }
+
+    fn import_measurements(self: Pin<&mut Self>, url: String) -> u32 {
+        handle_request(self, async move |_, _, measurement_service| {
+            let (file, path) = (|| -> Result<_, UrlError> {
+                let url = Url::parse(&url)?;
+                if url.scheme() != "file" {
+                    return Err(UrlError::UnsupportedScheme(url.scheme().to_string()));
+                }
+                let path = url.to_file_path().map_err(|()| {
+                    UrlError::InvalidHost(url.host_str().unwrap_or("<missing>").to_string())
+                })?;
+                let valid = path.is_file();
+                if !valid {
+                    return Err(UrlError::NotFound);
+                }
+                Ok((File::open(&path)?, path))
+            })()?;
+            measurement_service
+                .import_measurements(
+                    file,
+                    ImportOptions {
+                        ..ImportOptions::default()
+                    },
+                )
+                .await?;
+            // todo notify frontend of progress along the way for progress bar,
+            //      or at least the fact it finished
+            Ok(move |backend: Pin<&mut ffi::MeasurementModel>| {
+                backend.load_measurements();
+            })
         })
     }
 

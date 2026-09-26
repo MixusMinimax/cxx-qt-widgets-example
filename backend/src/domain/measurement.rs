@@ -1,9 +1,12 @@
+use crate::domain::measurement::io_impl::read_csv;
 use diesel::connection::SimpleConnection;
 use diesel::r2d2::{ConnectionManager, CustomizeConnection, Pool};
 use diesel::{AsChangeset, Insertable, Queryable, Selectable, SqliteConnection};
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 use sql_uuid::Uuid;
+use std::borrow::Cow;
 use std::convert::Infallible;
+use std::io;
 use std::num::{NonZeroU8, ParseFloatError};
 use tokio::task::spawn_blocking;
 
@@ -41,19 +44,19 @@ pub enum MeasurementServiceError {
     #[error("csv error: {0}")]
     Csv(#[from] csv::Error),
     #[error("io error: {0}")]
-    Io(#[from] std::io::Error),
+    Io(#[from] io::Error),
     #[error("export error: {0}")]
     Export(#[from] ExportError),
+    #[error("import error: {0}")]
+    Import(#[from] ImportError),
 }
 
 #[derive(Debug, thiserror::Error)]
 pub enum ExportError {
-    #[error("diesel error: {0}")]
-    Diesel(#[from] diesel::result::Error),
     #[error("csv error: {0}")]
     Csv(#[from] csv::Error),
     #[error("io error: {0}")]
-    Io(#[from] std::io::Error),
+    Io(#[from] io::Error),
     #[error("invalid timestamp")]
     InvalidTimestamp(f64),
 }
@@ -65,7 +68,7 @@ pub enum ImportError {
     #[error("csv error: {0}")]
     Csv(#[from] csv::Error),
     #[error("io error: {0}")]
-    Io(#[from] std::io::Error),
+    Io(#[from] io::Error),
     #[error("unknown header: {0}")]
     UnknownHeader(String),
     #[error("invalid uuid: {0}")]
@@ -141,25 +144,41 @@ pub struct MeasurementUpdated {
 
 #[derive(Clone, Eq, PartialEq, Debug, Default)]
 pub struct ExportOptions {
+    pub delimiter: Option<NonZeroU8>,
+    pub date_time_format: DateTimeFormat,
+    pub columns: Columns,
     pub export_id: bool,
     pub export_map: bool,
-    pub delimiter: Option<NonZeroU8>,
-    pub columns: Columns,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Default)]
 pub struct ImportOptions {
     pub delimiter: Option<NonZeroU8>,
     pub columns: Columns,
+    pub date_time_format: DateTimeFormat,
     pub import_collision_strategy: ImportCollisionStrategy,
     pub ignore_unknown_headers: bool,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Default)]
+pub enum DateTimeFormat {
+    #[default]
+    Rfc3339,
+    Rfc2822,
+    Format(Cow<'static, str>),
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Default)]
 pub enum ImportCollisionStrategy {
     #[default]
     Skip,
     Replace,
+}
+
+#[derive(Clone, Eq, PartialEq, Debug, Default)]
+pub struct ImportResult<R> {
+    reader: R,
+    inserted_rows: usize,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Default)]
@@ -265,7 +284,7 @@ impl MeasurementService {
         .map_err(Into::into)
     }
 
-    pub async fn export_measurements<W: std::io::Write + Send + 'static>(
+    pub async fn export_measurements<W: io::Write + Send + 'static>(
         &self,
         wtr: W,
         opts: ExportOptions,
@@ -275,93 +294,86 @@ impl MeasurementService {
 
         let pool = self.pool.clone();
         spawn_blocking(move || {
-            pool.get()
+            let m = pool
+                .get()
                 .unwrap()
-                .transaction::<_, MeasurementServiceError, _>(|connection| {
-                    Ok(ser::write_csv(
-                        measurements.load_iter(connection)?,
-                        wtr,
-                        opts,
-                    )?)
-                })
+                .transaction(|connection| measurements.load(connection))?;
+            Ok(io_impl::write_csv(m, wtr, opts)?)
         })
         .await
         .expect("join failed")
     }
 
-    pub async fn import_measurements() {}
+    pub async fn import_measurements<R: io::Read + Send + 'static>(
+        &self,
+        rdr: R,
+        opts @ ImportOptions {
+            import_collision_strategy,
+            ..
+        }: ImportOptions,
+    ) -> MSResult<ImportResult<R>> {
+        use crate::schema::measurements::dsl::*;
+        use diesel::prelude::*;
+
+        let pool = self.pool.clone();
+        spawn_blocking(move || {
+            let (parsed, rdr) = read_csv(rdr, opts)?;
+            pool.get().unwrap().transaction(|connection| {
+                if let ImportCollisionStrategy::Replace = import_collision_strategy {
+                    let timestamps = parsed.iter().map(|m| m.timestamp).collect::<Vec<_>>();
+                    diesel::delete(measurements.filter(timestamp.eq_any(timestamps)))
+                        .execute(connection)?;
+                }
+                let count = diesel::insert_into(measurements)
+                    .values(parsed)
+                    .execute(connection)?;
+                Ok(ImportResult {
+                    inserted_rows: count,
+                    reader: rdr,
+                })
+            })
+        })
+        .await
+        .expect("join failed")
+    }
 }
 
-mod ser {
-    use super::{ExportError, ExportOptions, ImportError, ImportOptions, Measurement};
-    use chrono::{DateTime, SecondsFormat, Utc};
-    use serde::Deserializer;
-    use serde::de::{Unexpected, Visitor};
-    use sql_uuid::Uuid;
-    use std::fmt::Formatter;
+mod io_impl {
+    use super::{
+        DateTimeFormat, ExportError, ExportOptions, ImportError, ImportOptions, Measurement,
+    };
+    use chrono::{DateTime, SecondsFormat};
+    use csv::StringRecord;
     use std::io::{Read, Write};
-    use std::str::FromStr;
 
-    pub fn de_uuid<'de, D: Deserializer<'de>>(d: D) -> Result<Uuid, D::Error> {
-        struct V;
-        impl<'de2> Visitor<'de2> for V {
-            type Value = Uuid;
-
-            fn expecting(&self, f: &mut Formatter) -> std::fmt::Result {
-                write!(f, "a uuid string")
-            }
-
-            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                Uuid::parse_str(v).map_err(|_| E::invalid_value(Unexpected::Str(v), &self))
-            }
-        }
-
-        d.deserialize_str(V)
-    }
-
-    pub fn de_ts<'de, D: Deserializer<'de>>(d: D) -> Result<f64, D::Error> {
-        struct V;
-
-        impl<'de2> Visitor<'de2> for V {
-            type Value = f64;
-
-            fn expecting(&self, f: &mut Formatter) -> std::fmt::Result {
-                write!(f, "an rfc 3339 datetime")
-            }
-
-            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                DateTime::<Utc>::from_str(v)
-                    .map(|dt| dt.timestamp() as f64)
-                    .map_err(|_| E::invalid_value(Unexpected::Str(v), &self))
-            }
-        }
-
-        d.deserialize_str(V)
-    }
-
-    pub fn write_csv<
-        E: std::error::Error,
-        I: IntoIterator<Item = Result<Measurement, E>>,
-        W: Write,
-    >(
+    pub fn write_csv<I: IntoIterator<Item = Measurement>, W: Write>(
         measurements: I,
         wtr: W,
         ExportOptions {
-            export_id,
-            export_map,
             delimiter,
             columns,
+            date_time_format,
+            export_id,
+            export_map,
         }: ExportOptions,
-    ) -> Result<W, ExportError>
-    where
-        ExportError: From<E>,
-    {
+    ) -> Result<W, ExportError> {
+        trait FormatDate {
+            fn format_date(&self, ts: f64) -> Result<String, ExportError>;
+        }
+
+        impl FormatDate for DateTimeFormat {
+            #[inline]
+            fn format_date(&self, ts: f64) -> Result<String, ExportError> {
+                let dt = DateTime::from_timestamp_secs(ts as i64)
+                    .ok_or(ExportError::InvalidTimestamp(ts))?;
+                Ok(match self {
+                    DateTimeFormat::Rfc3339 => dt.to_rfc3339_opts(SecondsFormat::Secs, true),
+                    DateTimeFormat::Rfc2822 => dt.to_rfc2822(),
+                    DateTimeFormat::Format(f) => format!("{}", dt.format(f)),
+                })
+            }
+        }
+
         let mut wtr = csv::WriterBuilder::new()
             .delimiter(delimiter.map(Into::into).unwrap_or(b','))
             .from_writer(wtr);
@@ -381,15 +393,15 @@ mod ser {
 
         let mut buf = Vec::<u8>::new();
 
-        for res in measurements {
-            let Measurement {
-                id,
-                systolic,
-                diastolic,
-                map,
-                pulse,
-                timestamp,
-            } = res?;
+        for Measurement {
+            id,
+            systolic,
+            diastolic,
+            map,
+            pulse,
+            timestamp,
+        } in measurements
+        {
             if export_id {
                 buf.clear();
                 write!(&mut buf, "{}", id.0.as_hyphenated())?;
@@ -410,9 +422,7 @@ mod ser {
             write!(&mut buf, "{}", pulse)?;
             wtr.write_field(&buf)?;
 
-            let date_time = DateTime::from_timestamp_secs(timestamp as i64)
-                .ok_or_else(|| ExportError::InvalidTimestamp(timestamp))?;
-            wtr.write_field(date_time.to_rfc3339_opts(SecondsFormat::Secs, true))?;
+            wtr.write_field(date_time_format.format_date(timestamp)?)?;
 
             wtr.write_record(None::<&[u8]>)?;
         }
@@ -427,10 +437,27 @@ mod ser {
         ImportOptions {
             delimiter,
             columns,
-            import_collision_strategy,
+            date_time_format,
             ignore_unknown_headers,
+            ..
         }: ImportOptions,
     ) -> Result<(Vec<Measurement>, R), ImportError> {
+        trait ParseDate {
+            fn parse_date(&self, s: &str) -> Result<f64, ImportError>;
+        }
+
+        impl ParseDate for DateTimeFormat {
+            #[inline]
+            fn parse_date(&self, s: &str) -> Result<f64, ImportError> {
+                let dt = match self {
+                    DateTimeFormat::Rfc3339 => DateTime::parse_from_rfc3339(s)?,
+                    DateTimeFormat::Rfc2822 => DateTime::parse_from_rfc2822(s)?,
+                    DateTimeFormat::Format(f) => DateTime::parse_from_str(s, f)?,
+                };
+                Ok(dt.timestamp() as f64 + dt.timestamp_subsec_millis() as f64 / 1000.)
+            }
+        }
+
         let mut rdr = csv::ReaderBuilder::new()
             .delimiter(delimiter.map(Into::into).unwrap_or(b','))
             .has_headers(true)
@@ -452,20 +479,21 @@ mod ser {
         let mut date_time_idx = None;
         for (i, h) in headers.iter().enumerate() {
             match () {
-                () if h == id_col => id_idx = Some(i),
-                () if h == systolic_col => systolic_idx = Some(i),
-                () if h == diastolic_col => diastolic_idx = Some(i),
-                () if h == map_col => map_idx = Some(i),
-                () if h == pulse_col => pulse_idx = Some(i),
-                () if h == date_time_col => date_time_idx = Some(i),
+                () if h.eq_ignore_ascii_case(id_col) => id_idx = Some(i),
+                () if h.eq_ignore_ascii_case(systolic_col) => systolic_idx = Some(i),
+                () if h.eq_ignore_ascii_case(diastolic_col) => diastolic_idx = Some(i),
+                () if h.eq_ignore_ascii_case(map_col) => map_idx = Some(i),
+                () if h.eq_ignore_ascii_case(pulse_col) => pulse_idx = Some(i),
+                () if h.eq_ignore_ascii_case(date_time_col) => date_time_idx = Some(i),
                 () if ignore_unknown_headers => {}
                 () => return Err(ImportError::UnknownHeader(h.to_string())),
             }
         }
 
         let mut res = Vec::new();
-        for rec in rdr.records() {
-            let rec = rec?;
+        // reuse StringRecord, as .iter() would do new allocations every time
+        let mut rec = StringRecord::with_capacity(0, headers.len());
+        while rdr.read_record(&mut rec)? {
             let mut measurement = Measurement::default();
             if let Some(id_idx) = id_idx {
                 measurement.id = rec[id_idx].parse()?;
@@ -483,9 +511,7 @@ mod ser {
                 measurement.pulse = rec[pulse_idx].parse()?;
             }
             if let Some(date_time_idx) = date_time_idx {
-                let dt = DateTime::parse_from_rfc3339(&rec[date_time_idx])?;
-                measurement.timestamp =
-                    dt.timestamp() as f64 + dt.timestamp_subsec_millis() as f64 / 1000.;
+                measurement.timestamp = date_time_format.parse_date(&rec[date_time_idx])?;
             }
             res.push(measurement);
         }
@@ -506,7 +532,6 @@ mod ser {
     mod tests {
         use super::*;
         use crate::domain::measurement::Columns;
-        use std::convert::Infallible;
         use std::num::NonZeroU8;
 
         #[test]
@@ -514,12 +539,12 @@ mod ser {
             let mut buf = Vec::<u8>::new();
 
             let it = write_csv(
-                [Ok::<Measurement, Infallible>(Measurement {
+                [Measurement {
                     systolic: 123.,
                     diastolic: 88.,
                     timestamp: (5 * 24 * 60 * 60) as f64,
                     ..Measurement::default()
-                })],
+                }],
                 &mut buf,
                 ExportOptions {
                     export_id: false,

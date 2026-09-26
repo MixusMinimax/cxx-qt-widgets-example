@@ -2,3 +2,5 @@
 /Cargo.lock
 .diesel_lock
 /data.db
+/data.db-shm
+/data.db-wal
