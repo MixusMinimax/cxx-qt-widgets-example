@@ -31,11 +31,10 @@
 - [ ] query daily/weekly/monthly average
 - [X] export csv
 - [ ] import csv
-  - if id is supplied, update those measurements
-    - in case of TS collision, fail
-    - in case of TS collision, warn (setting)
-  - if id is not supplied, timestamp is identifying
-    - in case of TS collision, replace existing measurement
-    - in case of TS collision, warn and keep old (setting)
-  - everything in one transaction
+  - on id collisions, replace old row
+  - on timestamp collisions, either:
+    - keep old row
+    - replace with new values
+      - if id was not specified, keep old id
+      - if id is new, delete old row
 - [ ] undo/redo (audited database?)

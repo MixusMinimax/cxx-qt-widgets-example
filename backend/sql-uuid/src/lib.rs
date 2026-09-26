@@ -4,7 +4,10 @@ use diesel::serialize::{self, Output, ToSql};
 use diesel::sql_types::Binary;
 use diesel::{AsExpression, FromSqlRow, deserialize};
 use std::fmt;
+use std::str::FromStr;
 use uuid::Bytes;
+
+pub use uuid;
 
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug, Default, FromSqlRow, AsExpression)]
 #[diesel(sql_type = Binary)]
@@ -60,6 +63,14 @@ impl From<uuid::Uuid> for Uuid {
 impl From<Uuid> for uuid::Uuid {
     fn from(Uuid(value): Uuid) -> Self {
         value
+    }
+}
+
+impl FromStr for Uuid {
+    type Err = uuid::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(uuid::Uuid::from_str(s)?))
     }
 }
 

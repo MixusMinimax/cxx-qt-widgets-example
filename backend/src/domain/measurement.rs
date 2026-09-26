@@ -4,7 +4,7 @@ use diesel::{AsChangeset, Insertable, Queryable, Selectable, SqliteConnection};
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 use sql_uuid::Uuid;
 use std::convert::Infallible;
-use std::num::NonZeroU8;
+use std::num::{NonZeroU8, ParseFloatError};
 use tokio::task::spawn_blocking;
 
 #[derive(Queryable, Selectable, Insertable, Clone, PartialEq, Debug, Default)]
@@ -58,6 +58,24 @@ pub enum ExportError {
     InvalidTimestamp(f64),
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum ImportError {
+    #[error("diesel error: {0}")]
+    Diesel(#[from] diesel::result::Error),
+    #[error("csv error: {0}")]
+    Csv(#[from] csv::Error),
+    #[error("io error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("unknown header: {0}")]
+    UnknownHeader(String),
+    #[error("invalid uuid: {0}")]
+    InvalidUuid(#[from] sql_uuid::uuid::Error),
+    #[error("invalid number: {0}")]
+    InvalidNumber(#[from] ParseFloatError),
+    #[error("invalid datetime: {0}")]
+    InvalidDateTime(#[from] chrono::ParseError),
+}
+
 impl From<Infallible> for ExportError {
     fn from(_: Infallible) -> Self {
         unreachable!()
@@ -82,10 +100,12 @@ impl MeasurementService {
                 conn.batch_execute("PRAGMA journal_mode = WAL;")?;
                 // fsync only in critical moments
                 conn.batch_execute("PRAGMA synchronous = NORMAL;")?;
-                // write WAL changes back every 1000 pages, for an in average 1MB WAL file.
-                // May affect readers if number is increased
+                // write WAL changes back every 1000 pages, for an in average
+                // 1MB WAL file. May affect readers if number is
+                // increased
                 conn.batch_execute("PRAGMA wal_autocheckpoint = 1000;")?;
-                // free some space by truncating possibly massive WAL files from the last run
+                // free some space by truncating possibly massive WAL files from
+                // the last run
                 conn.batch_execute("PRAGMA wal_checkpoint(TRUNCATE);")?;
                 Ok(())
             }
@@ -128,6 +148,21 @@ pub struct ExportOptions {
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Default)]
+pub struct ImportOptions {
+    pub delimiter: Option<NonZeroU8>,
+    pub columns: Columns,
+    pub import_collision_strategy: ImportCollisionStrategy,
+    pub ignore_unknown_headers: bool,
+}
+
+#[derive(Clone, Eq, PartialEq, Debug, Default)]
+pub enum ImportCollisionStrategy {
+    #[default]
+    Skip,
+    Replace,
+}
+
+#[derive(Clone, Eq, PartialEq, Debug, Default)]
 pub struct Columns {
     pub id: Option<String>,
     pub systolic: Option<String>,
@@ -136,9 +171,6 @@ pub struct Columns {
     pub pulse: Option<String>,
     pub date_time: Option<String>,
 }
-
-#[derive(Clone, Eq, PartialEq, Debug, Default)]
-pub struct ImportOptions {}
 
 type MSResult<T> = Result<T, MeasurementServiceError>;
 
@@ -256,10 +288,12 @@ impl MeasurementService {
         .await
         .expect("join failed")
     }
+
+    pub async fn import_measurements() {}
 }
 
 mod ser {
-    use super::{ExportError, ExportOptions, Measurement};
+    use super::{ExportError, ExportOptions, ImportError, ImportOptions, Measurement};
     use chrono::{DateTime, SecondsFormat, Utc};
     use serde::Deserializer;
     use serde::de::{Unexpected, Visitor};
@@ -329,7 +363,7 @@ mod ser {
         ExportError: From<E>,
     {
         let mut wtr = csv::WriterBuilder::new()
-            .delimiter(delimiter.map(Into::into).unwrap_or(b';'))
+            .delimiter(delimiter.map(Into::into).unwrap_or(b','))
             .from_writer(wtr);
 
         // write header
@@ -388,8 +422,75 @@ mod ser {
         Ok(wtr.into_inner().unwrap())
     }
 
-    pub fn read_csv<R: Read>(rdr: R) {
-        todo!()
+    pub fn read_csv<R: Read>(
+        rdr: R,
+        ImportOptions {
+            delimiter,
+            columns,
+            import_collision_strategy,
+            ignore_unknown_headers,
+        }: ImportOptions,
+    ) -> Result<(Vec<Measurement>, R), ImportError> {
+        let mut rdr = csv::ReaderBuilder::new()
+            .delimiter(delimiter.map(Into::into).unwrap_or(b','))
+            .has_headers(true)
+            .from_reader(rdr);
+
+        let id_col = columns.id.as_deref().unwrap_or(columns::ID);
+        let systolic_col = columns.systolic.as_deref().unwrap_or(columns::SYSTOLIC);
+        let diastolic_col = columns.diastolic.as_deref().unwrap_or(columns::DIASTOLIC);
+        let map_col = columns.map.as_deref().unwrap_or(columns::MAP);
+        let pulse_col = columns.pulse.as_deref().unwrap_or(columns::PULSE);
+        let date_time_col = columns.date_time.as_deref().unwrap_or(columns::DATE_TIME);
+
+        let headers = rdr.headers()?;
+        let mut id_idx = None;
+        let mut systolic_idx = None;
+        let mut diastolic_idx = None;
+        let mut map_idx = None;
+        let mut pulse_idx = None;
+        let mut date_time_idx = None;
+        for (i, h) in headers.iter().enumerate() {
+            match () {
+                () if h == id_col => id_idx = Some(i),
+                () if h == systolic_col => systolic_idx = Some(i),
+                () if h == diastolic_col => diastolic_idx = Some(i),
+                () if h == map_col => map_idx = Some(i),
+                () if h == pulse_col => pulse_idx = Some(i),
+                () if h == date_time_col => date_time_idx = Some(i),
+                () if ignore_unknown_headers => {}
+                () => return Err(ImportError::UnknownHeader(h.to_string())),
+            }
+        }
+
+        let mut res = Vec::new();
+        for rec in rdr.records() {
+            let rec = rec?;
+            let mut measurement = Measurement::default();
+            if let Some(id_idx) = id_idx {
+                measurement.id = rec[id_idx].parse()?;
+            }
+            if let Some(systolic_idx) = systolic_idx {
+                measurement.systolic = rec[systolic_idx].parse()?;
+            }
+            if let Some(diastolic_idx) = diastolic_idx {
+                measurement.diastolic = rec[diastolic_idx].parse()?;
+            }
+            if let Some(map_idx) = map_idx {
+                measurement.map = rec[map_idx].parse()?;
+            }
+            if let Some(pulse_idx) = pulse_idx {
+                measurement.pulse = rec[pulse_idx].parse()?;
+            }
+            if let Some(date_time_idx) = date_time_idx {
+                let dt = DateTime::parse_from_rfc3339(&rec[date_time_idx])?;
+                measurement.timestamp =
+                    dt.timestamp() as f64 + dt.timestamp_subsec_millis() as f64 / 1000.;
+            }
+            res.push(measurement);
+        }
+
+        Ok((res, rdr.into_inner()))
     }
 
     mod columns {
@@ -404,7 +505,9 @@ mod ser {
     #[cfg(test)]
     mod tests {
         use super::*;
+        use crate::domain::measurement::Columns;
         use std::convert::Infallible;
+        use std::num::NonZeroU8;
 
         #[test]
         fn test_write_csv() {
@@ -421,6 +524,7 @@ mod ser {
                 ExportOptions {
                     export_id: false,
                     export_map: false,
+                    delimiter: NonZeroU8::new(b';'),
                     ..ExportOptions::default()
                 },
             );
@@ -428,11 +532,47 @@ mod ser {
             assert!(it.is_ok());
             let it = it.unwrap();
 
-            // This would be a place to use std::bstr::ByteStr::new() once it's stable
+            // This would be a place to use std::bstr::ByteStr::new() once it's
+            // stable
             assert_eq!(
                 unsafe { str::from_utf8_unchecked(it) },
                 "Systolic;Diastolic;Pulse;Time\n\
                  123;88;0;1970-01-06T00:00:00Z\n",
+            );
+        }
+
+        #[test]
+        fn test_read_csv() {
+            let s = b"SYSTOLIC,DATETIME,MAP,DIASTOLIC\n\
+                               130,1970-01-05T00:00:00Z,90,85\n";
+
+            let columns = Columns {
+                systolic: Some("SYSTOLIC".to_string()),
+                diastolic: Some("DIASTOLIC".to_string()),
+                map: Some("MAP".to_string()),
+                date_time: Some("DATETIME".to_string()),
+                ..Columns::default()
+            };
+
+            let (measurements, _) = read_csv(
+                &s[..],
+                ImportOptions {
+                    delimiter: NonZeroU8::new(b','),
+                    columns,
+                    ..ImportOptions::default()
+                },
+            )
+            .expect("parsing should succeed");
+
+            assert_eq!(
+                measurements,
+                [Measurement {
+                    systolic: 130.,
+                    diastolic: 85.,
+                    map: 90.,
+                    timestamp: (4 * 24 * 60 * 60) as f64,
+                    ..Measurement::default()
+                }],
             );
         }
     }
@@ -471,7 +611,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_list() {
-        // in-memory database gets deleted if last connection is dropped, so we keep one alive during the test.
+        // in-memory database gets deleted if last connection is dropped, so we
+        // keep one alive during the test.
         let (sut, conn) = setup();
         let v = sut.load_measurements().await.unwrap();
         assert!(v.contains(&M0));

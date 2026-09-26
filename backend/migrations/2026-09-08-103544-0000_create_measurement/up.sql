@@ -1,9 +1,9 @@
 CREATE TABLE measurements
 (
-    id        BLOB   NOT NULL PRIMARY KEY,
+    id        BLOB   NOT NULL PRIMARY KEY ON CONFLICT REPLACE,
     systolic  DOUBLE NOT NULL,
     diastolic DOUBLE NOT NULL,
     map       DOUBLE NOT NULL DEFAULT 0,
     pulse     DOUBLE NOT NULL,
-    timestamp DOUBLE NOT NULL UNIQUE
+    timestamp DOUBLE NOT NULL UNIQUE ON CONFLICT IGNORE
 ) WITHOUT ROWID;
