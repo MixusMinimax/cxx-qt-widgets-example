@@ -12,6 +12,10 @@ int main(int argc, char *argv[])
 
     const QApplication app{argc, argv};
 
+    QCoreApplication::setOrganizationName("Barmetler");
+    QCoreApplication::setOrganizationDomain("barmetler.com");
+    QCoreApplication::setApplicationName("Blood Pressure Diary");
+
     const auto model = std::make_unique<measurements::MeasurementModel>();
     model->initialize(controller->handle());
 

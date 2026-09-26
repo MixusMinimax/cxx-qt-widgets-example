@@ -294,10 +294,9 @@ impl MeasurementService {
 
         let pool = self.pool.clone();
         spawn_blocking(move || {
-            let m = pool
-                .get()
-                .unwrap()
-                .transaction(|connection| measurements.load(connection))?;
+            let m = pool.get().unwrap().transaction(|connection| {
+                measurements.order_by(timestamp.asc()).load(connection)
+            })?;
             Ok(io_impl::write_csv(m, wtr, opts)?)
         })
         .await
@@ -317,7 +316,14 @@ impl MeasurementService {
 
         let pool = self.pool.clone();
         spawn_blocking(move || {
-            let (parsed, rdr) = read_csv(rdr, opts)?;
+            let (mut parsed, rdr) = read_csv(rdr, opts)?;
+            parsed.iter_mut().for_each(|m| {
+                if m.id.0.is_nil() {
+                    m.id = Uuid::new_v4();
+                }
+                // we purposefully do not fix MAP on insert, so that the formula
+                // can change
+            });
             pool.get().unwrap().transaction(|connection| {
                 if let ImportCollisionStrategy::Replace = import_collision_strategy {
                     let timestamps = parsed.iter().map(|m| m.timestamp).collect::<Vec<_>>();

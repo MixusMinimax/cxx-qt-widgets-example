@@ -4,11 +4,10 @@
 #include "ui_MainWindow.h"
 
 #include <QDebug>
+#include <QSettings>
 #include <QStatusBar>
 #include <QWidget>
 #include <backend/src/backend.cxxqt.h>
-
-#include <QtCore/qchar.h>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow{parent}, m_measurementModal{new MeasurementModal{this}}, m_ui{std::make_unique<Ui::MainWindow>()}
@@ -98,17 +97,27 @@ void MainWindow::newProject() const
 
 void MainWindow::open()
 {
+    constexpr static auto KEY = "transfer/import/dir";
+
     qDebug() << "MainWindow::open()";
     statusBar()->showMessage(tr("open"));
-    const auto file = QFileDialog::getOpenFileUrl(
-        this, tr("Import CSV"), QUrl::fromLocalFile(QDir::homePath()), tr("CSV files (*.csv)")
-    );
-    qDebug() << "import file:" << file.toString();
+    QSettings settings{};
+    auto url = settings.value(KEY).toUrl();
+    if (!url.isValid()) {
+        url = QUrl::fromLocalFile(QDir::homePath());
+    }
+    url = QFileDialog::getOpenFileUrl(this, tr("Import CSV"), url, tr("CSV files (*.csv)"));
+    qDebug() << "import file:" << url.toString();
+    if (url.isEmpty()) {
+        qDebug() << "MainWindow::open: canceled";
+        return;
+    }
+    settings.setValue(KEY, url.adjusted(QUrl::RemoveFilename));
     if (!m_model) {
         qDebug() << "MainWindow::open: m_model was null";
         return;
     }
-    m_model->import_measurements(file.toString().toStdString());
+    m_model->import_measurements(url.toString().toStdString());
 }
 
 void MainWindow::save()
@@ -120,18 +129,29 @@ void MainWindow::save()
 
 void MainWindow::save_as()
 {
+    constexpr static auto KEY = "transfer/export/dir";
+
     qDebug() << "MainWindow::save_as()";
     statusBar()->showMessage(tr("save_as"));
+    QSettings settings{};
+    auto url = settings.value(KEY).toUrl();
+    if (!url.isValid()) {
+        url = QUrl::fromLocalFile(QDir::homePath());
+    }
     auto name = QDateTime::currentDateTime().toString("yyyy-MM-ddThh:mm");
     name.append(".csv");
-    const auto file = QFileDialog::getSaveFileUrl(
-        this, tr("Export CSV"), QUrl::fromLocalFile(QDir::home().filePath(name)), tr("CSV files (*.csv)")
-    );
+    url.setPath(QDir{url.path()}.filePath(name));
+    url = QFileDialog::getSaveFileUrl(this, tr("Export CSV"), url, tr("CSV files (*.csv)"));
+    if (url.isEmpty()) {
+        qDebug() << "MainWindow::save_as: canceled";
+        return;
+    }
+    settings.setValue(KEY, url.adjusted(QUrl::RemoveFilename));
     if (!m_model) {
         qDebug() << "MainWindow::save_as: m_model was null";
         return;
     }
-    m_model->export_measurements(file.toString().toStdString());
+    m_model->export_measurements(url.toString().toStdString());
 }
 
 void MainWindow::quit()

@@ -17,7 +17,9 @@
 - [X] allow deleting measurement from modal
 - [ ] check datetime in modal for collisions for better feedback
 - [X] data export file picker
+  - [ ] data export settings modal
 - [ ] data import file picker
+  - [ ] data import settings modal
 
 ### model
 
@@ -30,7 +32,9 @@
 - [ ] query range
 - [ ] query daily/weekly/monthly average
 - [X] export csv
-- [ ] import csv
+  - [ ] accept settings
+- [X] import csv
+  - [ ] accept settings
   - on id collisions, replace old row
   - on timestamp collisions, either:
     - keep old row

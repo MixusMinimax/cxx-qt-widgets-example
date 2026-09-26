@@ -1,7 +1,7 @@
 use crate::controller::AsyncControllerHandle;
 use crate::domain::measurement::{
-    ExportOptions, ImportOptions, Measurement, MeasurementChangeset, MeasurementService,
-    MeasurementServiceError, MeasurementUpdated,
+    ExportOptions, ImportCollisionStrategy, ImportOptions, Measurement, MeasurementChangeset,
+    MeasurementService, MeasurementServiceError, MeasurementUpdated,
 };
 use cxx_qt::{CxxQtType, Threading};
 use cxx_qt_lib::QString;
@@ -13,7 +13,6 @@ use std::cmp::Ordering;
 use std::fs::{File, create_dir_all};
 use std::io::Write;
 use std::mem::offset_of;
-use std::num::{NonZero, NonZeroU8};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::{env, mem, slice};
@@ -357,6 +356,7 @@ impl ffi::MeasurementModel {
                 .import_measurements(
                     file,
                     ImportOptions {
+                        import_collision_strategy: ImportCollisionStrategy::Replace,
                         ..ImportOptions::default()
                     },
                 )
