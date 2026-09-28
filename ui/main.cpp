@@ -1,12 +1,15 @@
 #include "MainWindow.h"
+#include "config.h"
 
 #include <QApplication>
+#include <QDir>
 #include <QSettings>
+#include <QStandardPaths>
+#include <QUrl>
 #include <backend/src/backend.cxxqt.h>
 #include <backend/src/controller.cxx.h>
 
 #include <memory>
-#include <qurl.h>
 
 int main(int argc, char *argv[])
 {
@@ -14,12 +17,23 @@ int main(int argc, char *argv[])
 
     const QApplication app{argc, argv};
 
-    QCoreApplication::setOrganizationName("Barmetler");
-    QCoreApplication::setOrganizationDomain("barmetler.com");
-    QCoreApplication::setApplicationName("Blood Pressure Diary");
+    QCoreApplication::setOrganizationName(config::ORGANIZATION);
+    QCoreApplication::setOrganizationDomain(config::ORGANIZATION_DOMAIN);
+    QCoreApplication::setApplicationName(config::APPLICATION_NAME);
+
+    if (!QSettings{}.value(config::SETTING_DATABASE_CONNECTION).isValid()) {
+        QSettings{}.setValue(
+            config::SETTING_DATABASE_CONNECTION,
+            QUrl::fromLocalFile(
+                QDir{QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)}.filePath("data.db")
+            )
+        );
+    }
 
     const auto model = std::make_unique<measurements::MeasurementModel>();
-    model->initialize(controller->handle(), QSettings{}.value("DatabaseConnection").toUrl().toString().toStdString());
+    model->initialize(
+        controller->handle(), QSettings{}.value(config::SETTING_DATABASE_CONNECTION).toUrl().toString().toStdString()
+    );
 
     MainWindow window{};
     window.setModel(model.get());

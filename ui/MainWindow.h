@@ -2,6 +2,7 @@
 #define MYAPP_MAINWINDOW_H
 
 #include "MeasurementDialog.h"
+#include "PreferencesDialog.h"
 
 #include <QMainWindow>
 #include <backend/src/backend.cxxqt.h>
@@ -36,9 +37,13 @@ private slots:
     void quit();
     void about() const;
 
+public slots:
+    void openPreferences() const;
+
 private:
     measurements::MeasurementModel *m_model{nullptr};
     MeasurementDialog *m_measurementDialog;
+    PreferencesDialog *m_preferencesDialog;
     std::array<QMetaObject::Connection, 1> m_modelConnections{};
     std::unique_ptr<Ui::MainWindow> m_ui;
 };

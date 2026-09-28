@@ -3,8 +3,11 @@
 //
 
 #include "PreferencesDialog.h"
+#include "config.h"
 
 #include "ui_PreferencesDialog.h"
+
+#include <QSettings>
 
 PreferencesDialog::PreferencesDialog(QWidget *parent) : QDialog{parent}, m_ui{std::make_unique<Ui::PreferencesDialog>()}
 {
@@ -12,3 +15,8 @@ PreferencesDialog::PreferencesDialog(QWidget *parent) : QDialog{parent}, m_ui{st
 }
 
 PreferencesDialog::~PreferencesDialog() = default;
+
+void PreferencesDialog::reset()
+{
+    m_ui->databaseConnectionEdit->setText(QSettings{}.value(config::SETTING_DATABASE_CONNECTION).toUrl().toString());
+}

@@ -10,7 +10,10 @@
 #include <backend/src/backend.cxxqt.h>
 
 MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow{parent}, m_measurementDialog{new MeasurementDialog{this}}, m_ui{std::make_unique<Ui::MainWindow>()}
+    : QMainWindow{parent},
+      m_measurementDialog{new MeasurementDialog{this}},
+      m_preferencesDialog{new PreferencesDialog{this}},
+      m_ui{std::make_unique<Ui::MainWindow>()}
 {
     m_ui->setupUi(this);
 
@@ -29,7 +32,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_ui->actionSave, &QAction::triggered, this, &MainWindow::save);
     connect(m_ui->actionSaveAs, &QAction::triggered, this, &MainWindow::save_as);
     connect(m_ui->actionQuit, &QAction::triggered, this, &MainWindow::quit);
-    connect(m_ui->actionAbout, &QAction::triggered, this, &MainWindow::about);
+    connect(m_ui->actionSettings, &QAction::triggered, this, &MainWindow::openPreferences);
     connect(m_ui->actionAbout, &QAction::triggered, this, &MainWindow::about);
 
     connect(m_ui->graphOutput, &BloodPressureGraph::measurementEditStarted, [this](measurements::measurement m) {
@@ -62,6 +65,8 @@ MainWindow::MainWindow(QWidget *parent)
                 break;
         }
     });
+
+    connect(m_preferencesDialog, &PreferencesDialog::accepted, [] { qDebug() << "preferences accepted"; });
 }
 
 MainWindow::~MainWindow() = default;
@@ -104,7 +109,7 @@ void MainWindow::open()
     QSettings settings{};
     auto url = settings.value(KEY).toUrl();
     if (!url.isValid()) {
-        url = QUrl::fromLocalFile(QDir::homePath());
+        url = QUrl::fromLocalFile(QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation));
     }
     url = QFileDialog::getOpenFileUrl(this, tr("Import CSV"), url, tr("CSV files (*.csv)"));
     qDebug() << "import file:" << url.toString();
@@ -136,7 +141,7 @@ void MainWindow::save_as()
     QSettings settings{};
     auto url = settings.value(KEY).toUrl();
     if (!url.isValid()) {
-        url = QUrl::fromLocalFile(QDir::homePath());
+        url = QUrl::fromLocalFile(QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation));
     }
     auto name = QDateTime::currentDateTime().toString("yyyy-MM-ddThh:mm");
     name.append(".csv");
@@ -165,4 +170,10 @@ void MainWindow::about() const
 {
     qDebug() << "MainWindow::about()";
     statusBar()->showMessage(tr("about"));
+}
+void MainWindow::openPreferences() const
+{
+    m_preferencesDialog->setModal(true);
+    m_preferencesDialog->reset();
+    m_preferencesDialog->show();
 }

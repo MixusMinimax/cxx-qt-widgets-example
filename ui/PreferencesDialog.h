@@ -20,6 +20,8 @@ public:
     explicit PreferencesDialog(QWidget *parent = nullptr);
     ~PreferencesDialog() override;
 
+    void reset();
+
 private:
     std::unique_ptr<Ui::PreferencesDialog> m_ui;
 };

@@ -74,7 +74,7 @@ mod ffi {
             self: Pin<&mut MeasurementModel>,
             tokio_handle: Box<AsyncControllerHandle>,
             connection_string: String,
-        );
+        ) -> Result<()>;
 
         fn load_measurements(self: Pin<&mut MeasurementModel>) -> u32;
 
@@ -198,7 +198,27 @@ impl ffi::MeasurementModel {
         self: Pin<&mut Self>,
         tokio_handle: Box<AsyncControllerHandle>,
         connection_string: String,
-    ) {
+    ) -> Result<(), HandlerError> {
+        (|| -> Result<(), UrlError> {
+            let url = Url::parse(&connection_string)?;
+            if url.scheme() != "file" {
+                return Err(UrlError::UnsupportedScheme(url.scheme().to_string()));
+            }
+            let path = url.to_file_path().map_err(|()| {
+                UrlError::InvalidHost(url.host_str().unwrap_or("<missing>").to_string())
+            })?;
+            let valid = !path.exists() || path.is_file();
+            if !valid {
+                return Err(UrlError::AlreadyExists);
+            }
+            if let Some(parent) = path.parent()
+                && !parent.exists()
+            {
+                create_dir_all(parent)?;
+            }
+            Ok(())
+        })()?;
+
         let mut rm = self.rust_mut();
         if let Some(old) = rm.inner.take() {
             old.tokio_handle.cancel();
@@ -215,6 +235,7 @@ impl ffi::MeasurementModel {
                 measurements: Default::default(),
             });
         }
+        Ok(())
     }
 
     fn load_measurements(self: Pin<&mut Self>) -> u32 {
