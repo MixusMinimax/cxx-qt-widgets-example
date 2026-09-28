@@ -1,9 +1,4 @@
-//
-// Created by maxi on 9/7/26.
-//
-
-#ifndef MYAPP_MEASUREMENTMODAL_H
-#define MYAPP_MEASUREMENTMODAL_H
+#pragma once
 
 #include <QDialog>
 
@@ -21,13 +16,13 @@ namespace measurements
 QT_BEGIN_NAMESPACE
 namespace Ui
 {
-    class MeasurementModal;
+    class MeasurementDialog;
 }
 QT_END_NAMESPACE
 
 using initialize_opts = std::variant<QDateTime, measurements::measurement>;
 
-class MeasurementModal : public QDialog
+class MeasurementDialog : public QDialog
 {
     Q_OBJECT
 
@@ -40,8 +35,8 @@ public:
     };
     Q_ENUM(AcceptMode)
 
-    explicit MeasurementModal(QWidget *parent = nullptr);
-    ~MeasurementModal() override;
+    explicit MeasurementDialog(QWidget *parent = nullptr);
+    ~MeasurementDialog() override;
 
     void initialize(const initialize_opts &opts);
     [[nodiscard]] measurements::measurement measurement() const;
@@ -57,9 +52,6 @@ protected:
     AcceptMode m_acceptMode;
 
 private:
-    std::unique_ptr<Ui::MeasurementModal> m_ui;
+    std::unique_ptr<Ui::MeasurementDialog> m_ui;
     std::array<std::uint8_t, 16> m_id{};
 };
-
-
-#endif // MYAPP_MEASUREMENTMODAL_H

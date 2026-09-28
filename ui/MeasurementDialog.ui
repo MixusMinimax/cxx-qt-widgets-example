@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>MeasurementModal</class>
- <widget class="QDialog" name="MeasurementModal">
+ <class>MeasurementDialog</class>
+ <widget class="QDialog" name="MeasurementDialog">
   <property name="geometry">
    <rect>
     <x>0</x>
@@ -17,7 +17,7 @@
    </sizepolicy>
   </property>
   <property name="windowTitle">
-   <string>MeasurementModal</string>
+   <string>MeasurementDialog</string>
   </property>
   <property name="styleSheet">
    <string notr="true">QLineEdit[readOnly=true] {

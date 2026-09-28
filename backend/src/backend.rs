@@ -5,7 +5,6 @@ use crate::domain::measurement::{
 };
 use cxx_qt::{CxxQtType, Threading};
 use cxx_qt_lib::QString;
-use dotenvy::dotenv;
 use sql_uuid::Uuid;
 use static_assertions::{assert_eq_align, assert_eq_size, const_assert_eq};
 use std::cell::OnceCell;
@@ -15,7 +14,7 @@ use std::io::Write;
 use std::mem::offset_of;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::{env, mem, slice};
+use std::{mem, slice};
 use tokio_util::sync::CancellationToken;
 use url::Url;
 
@@ -71,7 +70,11 @@ mod ffi {
         #[qobject]
         type MeasurementModel = super::MeasurementModelRust;
 
-        fn initialize(self: Pin<&mut MeasurementModel>, tokio_handle: Box<AsyncControllerHandle>);
+        fn initialize(
+            self: Pin<&mut MeasurementModel>,
+            tokio_handle: Box<AsyncControllerHandle>,
+            connection_string: String,
+        );
 
         fn load_measurements(self: Pin<&mut MeasurementModel>) -> u32;
 
@@ -103,7 +106,7 @@ mod ffi {
 
 #[derive(Default)]
 pub struct MeasurementModelRust {
-    inner: OnceCell<MeasurementModelRustInner>,
+    inner: Option<MeasurementModelRustInner>,
 }
 
 #[derive(Debug)]
@@ -147,21 +150,40 @@ where
     F: FnOnce(CancellationToken, u32, Arc<MeasurementService>) -> O + Send + 'static,
 {
     let mut rm = m.as_mut().rust_mut();
-    let inner = rm.inner.get_mut().unwrap();
+    let inner = rm.inner.as_mut().unwrap();
     let req_id = inner.req_id;
     inner.req_id += 1;
     let qt_thread = m.qt_thread();
-    let rust = m.rust().inner.get().unwrap();
+    let rust = m.rust().inner.as_ref().unwrap();
     let measurement_service: Arc<MeasurementService> = rust.measurement_service.clone();
-    rust.tokio_handle.spawn_cb(async move |ct| {
-        match handler(ct, req_id, measurement_service).await {
+    let _ = rust.tokio_handle.spawn_cb(async move |ct| {
+        let res = handler(ct.clone(), req_id, measurement_service).await;
+        if ct.is_cancelled() {
+            return;
+        }
+        match res {
             Ok(cb) => {
-                qt_thread.queue(cb).inspect_err(|e| eprintln!("{e}")).ok();
+                qt_thread
+                    .queue(move |be| {
+                        // cb might already be queued by the time we try to
+                        // cancel it.
+                        if ct.is_cancelled() {
+                            return;
+                        }
+                        cb(be)
+                    })
+                    .inspect_err(|e| eprintln!("{e}"))
+                    .ok();
             }
             Err(e) => {
                 eprintln!("{}", e);
                 qt_thread
-                    .queue(move |backend| backend.failure(req_id, QString::from(e.to_string())))
+                    .queue(move |backend| {
+                        if ct.is_cancelled() {
+                            return;
+                        }
+                        backend.failure(req_id, QString::from(e.to_string()))
+                    })
                     .inspect_err(|e| eprintln!("{e}"))
                     .ok();
             }
@@ -172,19 +194,27 @@ where
 }
 
 impl ffi::MeasurementModel {
-    fn initialize(self: Pin<&mut Self>, tokio_handle: Box<AsyncControllerHandle>) {
-        dotenv().ok();
-        let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-
-        self.rust_mut()
-            .inner
-            .set(MeasurementModelRustInner {
+    fn initialize(
+        self: Pin<&mut Self>,
+        tokio_handle: Box<AsyncControllerHandle>,
+        connection_string: String,
+    ) {
+        let mut rm = self.rust_mut();
+        if let Some(old) = rm.inner.take() {
+            old.tokio_handle.cancel();
+            rm.inner = Some(MeasurementModelRustInner {
                 tokio_handle,
-                measurement_service: Arc::new(MeasurementService::new(database_url)),
+                measurement_service: Arc::new(MeasurementService::new(connection_string)),
+                ..old
+            });
+        } else {
+            rm.inner = Some(MeasurementModelRustInner {
+                tokio_handle,
+                measurement_service: Arc::new(MeasurementService::new(connection_string)),
                 req_id: Default::default(),
                 measurements: Default::default(),
-            })
-            .unwrap();
+            });
+        }
     }
 
     fn load_measurements(self: Pin<&mut Self>) -> u32 {
@@ -196,11 +226,11 @@ impl ffi::MeasurementModel {
                     .as_mut()
                     .rust_mut()
                     .inner
-                    .get_mut()
+                    .as_mut()
                     .unwrap()
                     .measurements = v;
                 let measurements = unsafe {
-                    let r = &backend.inner.get().unwrap().measurements;
+                    let r = &backend.inner.as_ref().unwrap().measurements;
                     slice::from_raw_parts(r.as_ptr(), r.len())
                 };
                 backend.measurements_loaded(req_id, measurements);
@@ -216,7 +246,7 @@ impl ffi::MeasurementModel {
             let m = ffi::Measurement::from(m);
             Ok(move |mut backend: Pin<&mut ffi::MeasurementModel>| {
                 let mut rm = backend.as_mut().rust_mut();
-                let measurements = &mut rm.inner.get_mut().unwrap().measurements;
+                let measurements = &mut rm.inner.as_mut().unwrap().measurements;
                 let idx = measurements.partition_point(|x| x.key <= m.key);
                 // expensive. Might consider something else down the line.
                 measurements.insert(idx, m);
@@ -237,7 +267,7 @@ impl ffi::MeasurementModel {
             let new: ffi::Measurement = new.into();
             Ok(move |mut backend: Pin<&mut ffi::MeasurementModel>| {
                 let mut rm = backend.as_mut().rust_mut();
-                let measurements = &mut rm.inner.get_mut().unwrap().measurements;
+                let measurements = &mut rm.inner.as_mut().unwrap().measurements;
                 let idx = measurements.partition_point(|x| x.key < new.key);
                 // PartialOrd vs Ord is not relevant because nothing is NAN or
                 // infinity.
@@ -282,7 +312,7 @@ impl ffi::MeasurementModel {
             let deleted: ffi::Measurement = deleted.into();
             Ok(move |mut backend: Pin<&mut ffi::MeasurementModel>| {
                 let mut rm = backend.as_mut().rust_mut();
-                let measurements = &mut rm.inner.get_mut().unwrap().measurements;
+                let measurements = &mut rm.inner.as_mut().unwrap().measurements;
                 if let Ok(idx) = measurements.binary_search_by(|x| {
                     x.key.partial_cmp(&deleted.key).unwrap_or(Ordering::Equal)
                 }) {
@@ -370,7 +400,7 @@ impl ffi::MeasurementModel {
     }
 
     fn measurements(&self) -> &[ffi::Measurement] {
-        &self.rust().inner.get().unwrap().measurements
+        &self.rust().inner.as_ref().unwrap().measurements
     }
 }
 

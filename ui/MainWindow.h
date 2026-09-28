@@ -1,7 +1,7 @@
 #ifndef MYAPP_MAINWINDOW_H
 #define MYAPP_MAINWINDOW_H
 
-#include "MeasurementModal.h"
+#include "MeasurementDialog.h"
 
 #include <QMainWindow>
 #include <backend/src/backend.cxxqt.h>
@@ -38,7 +38,7 @@ private slots:
 
 private:
     measurements::MeasurementModel *m_model{nullptr};
-    MeasurementModal *m_measurementModal;
+    MeasurementDialog *m_measurementDialog;
     std::array<QMetaObject::Connection, 1> m_modelConnections{};
     std::unique_ptr<Ui::MainWindow> m_ui;
 };

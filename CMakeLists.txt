@@ -53,12 +53,14 @@ qt_add_executable(myapp
         ui/MainWindow.ui
         ui/BloodPressureGraph.cpp
         ui/BloodPressureGraph.h
-        ui/MeasurementModal.cpp
-        ui/MeasurementModal.h
-        ui/MeasurementModal.ui
+        ui/MeasurementDialog.cpp
+        ui/MeasurementDialog.h
+        ui/MeasurementDialog.ui
+        ui/PreferencesDialog.cpp
+        ui/PreferencesDialog.h
+        ui/PreferencesDialog.ui
 
         ui/MyModel.cpp
-        ui/MyModel.h
 )
 
 target_include_directories(myapp PUBLIC ui)

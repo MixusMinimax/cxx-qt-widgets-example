@@ -1,10 +1,12 @@
 #include "MainWindow.h"
 
 #include <QApplication>
+#include <QSettings>
 #include <backend/src/backend.cxxqt.h>
 #include <backend/src/controller.cxx.h>
 
 #include <memory>
+#include <qurl.h>
 
 int main(int argc, char *argv[])
 {
@@ -17,7 +19,7 @@ int main(int argc, char *argv[])
     QCoreApplication::setApplicationName("Blood Pressure Diary");
 
     const auto model = std::make_unique<measurements::MeasurementModel>();
-    model->initialize(controller->handle());
+    model->initialize(controller->handle(), QSettings{}.value("DatabaseConnection").toUrl().toString().toStdString());
 
     MainWindow window{};
     window.setModel(model.get());

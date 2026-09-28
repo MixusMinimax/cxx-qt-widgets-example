@@ -10,7 +10,7 @@
 #include <backend/src/backend.cxxqt.h>
 
 MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow{parent}, m_measurementModal{new MeasurementModal{this}}, m_ui{std::make_unique<Ui::MainWindow>()}
+    : QMainWindow{parent}, m_measurementDialog{new MeasurementDialog{this}}, m_ui{std::make_unique<Ui::MainWindow>()}
 {
     m_ui->setupUi(this);
 
@@ -33,32 +33,32 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_ui->actionAbout, &QAction::triggered, this, &MainWindow::about);
 
     connect(m_ui->graphOutput, &BloodPressureGraph::measurementEditStarted, [this](measurements::measurement m) {
-        m_measurementModal->initialize(m);
-        m_measurementModal->setModal(true);
-        m_measurementModal->show();
-        m_measurementModal->raise();
-        m_measurementModal->activateWindow();
+        m_measurementDialog->initialize(m);
+        m_measurementDialog->setModal(true);
+        m_measurementDialog->show();
+        m_measurementDialog->raise();
+        m_measurementDialog->activateWindow();
     });
 
     connect(m_ui->graphOutput, &BloodPressureGraph::measurementCreateStarted, [this](QDateTime date_time) {
-        m_measurementModal->initialize(std::move(date_time));
-        m_measurementModal->setModal(true);
-        m_measurementModal->show();
-        m_measurementModal->raise();
-        m_measurementModal->activateWindow();
+        m_measurementDialog->initialize(std::move(date_time));
+        m_measurementDialog->setModal(true);
+        m_measurementDialog->show();
+        m_measurementDialog->raise();
+        m_measurementDialog->activateWindow();
     });
 
-    connect(m_measurementModal, &MeasurementModal::accepted, [this] {
+    connect(m_measurementDialog, &MeasurementDialog::accepted, [this] {
         if (!m_model) return;
-        switch (m_measurementModal->acceptMode()) {
-            case MeasurementModal::AcceptCreate:
-                m_model->create_measurement(m_measurementModal->measurement());
+        switch (m_measurementDialog->acceptMode()) {
+            case MeasurementDialog::AcceptCreate:
+                m_model->create_measurement(m_measurementDialog->measurement());
                 break;
-            case MeasurementModal::AcceptUpdate:
-                m_model->update_measurement(m_measurementModal->measurement());
+            case MeasurementDialog::AcceptUpdate:
+                m_model->update_measurement(m_measurementDialog->measurement());
                 break;
-            case MeasurementModal::AcceptDelete:
-                m_model->delete_measurement(m_measurementModal->measurement().id);
+            case MeasurementDialog::AcceptDelete:
+                m_model->delete_measurement(m_measurementDialog->measurement().id);
                 break;
         }
     });

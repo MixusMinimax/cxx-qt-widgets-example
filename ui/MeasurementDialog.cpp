@@ -2,12 +2,12 @@
 // Created by maxi on 9/7/26.
 //
 
-// You may need to build the project (run Qt uic code generator) to get "ui_MeasurementModal.h" resolved
+// You may need to build the project (run Qt uic code generator) to get "ui_MeasurementDialog.h" resolved
 
-#include "MeasurementModal.h"
+#include "MeasurementDialog.h"
 
 #include "overloaded.h"
-#include "ui_MeasurementModal.h"
+#include "ui_MeasurementDialog.h"
 
 #include <backend/src/backend.cxxqt.h>
 
@@ -16,19 +16,19 @@
 
 static QDateTime roundToMinute(const QDateTime &dt);
 
-MeasurementModal::MeasurementModal(QWidget *parent) : QDialog{parent}, m_ui{std::make_unique<Ui::MeasurementModal>()}
+MeasurementDialog::MeasurementDialog(QWidget *parent) : QDialog{parent}, m_ui{std::make_unique<Ui::MeasurementDialog>()}
 {
     m_ui->setupUi(this);
 
-    connect(m_ui->systolicEdit, &QSpinBox::editingFinished, this, &MeasurementModal::validate);
-    connect(m_ui->diastolicEdit, &QSpinBox::editingFinished, this, &MeasurementModal::validate);
-    connect(m_ui->mapEdit, &QSpinBox::editingFinished, this, &MeasurementModal::validate);
-    connect(m_ui->pulseEdit, &QSpinBox::editingFinished, this, &MeasurementModal::validate);
-    connect(m_ui->systolicEdit, &QSpinBox::textChanged, this, &MeasurementModal::validate);
-    connect(m_ui->diastolicEdit, &QSpinBox::textChanged, this, &MeasurementModal::validate);
-    connect(m_ui->mapEdit, &QSpinBox::textChanged, this, &MeasurementModal::validate);
-    connect(m_ui->pulseEdit, &QSpinBox::textChanged, this, &MeasurementModal::validate);
-    connect(m_ui->dateTimeEdit, &QDateTimeEdit::dateTimeChanged, this, &MeasurementModal::validate);
+    connect(m_ui->systolicEdit, &QSpinBox::editingFinished, this, &MeasurementDialog::validate);
+    connect(m_ui->diastolicEdit, &QSpinBox::editingFinished, this, &MeasurementDialog::validate);
+    connect(m_ui->mapEdit, &QSpinBox::editingFinished, this, &MeasurementDialog::validate);
+    connect(m_ui->pulseEdit, &QSpinBox::editingFinished, this, &MeasurementDialog::validate);
+    connect(m_ui->systolicEdit, &QSpinBox::textChanged, this, &MeasurementDialog::validate);
+    connect(m_ui->diastolicEdit, &QSpinBox::textChanged, this, &MeasurementDialog::validate);
+    connect(m_ui->mapEdit, &QSpinBox::textChanged, this, &MeasurementDialog::validate);
+    connect(m_ui->pulseEdit, &QSpinBox::textChanged, this, &MeasurementDialog::validate);
+    connect(m_ui->dateTimeEdit, &QDateTimeEdit::dateTimeChanged, this, &MeasurementDialog::validate);
 
     connect(m_ui->buttonBox, &QDialogButtonBox::accepted, this, &QDialog::accept);
     connect(m_ui->buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
@@ -39,9 +39,9 @@ MeasurementModal::MeasurementModal(QWidget *parent) : QDialog{parent}, m_ui{std:
     });
 }
 
-MeasurementModal::~MeasurementModal() = default;
+MeasurementDialog::~MeasurementDialog() = default;
 
-void MeasurementModal::initialize(const initialize_opts &opts)
+void MeasurementDialog::initialize(const initialize_opts &opts)
 {
     const auto initialize = [](QSpinBox *input, const double value) {
         input->setValue(
@@ -83,7 +83,7 @@ void MeasurementModal::initialize(const initialize_opts &opts)
     m_ui->systolicEdit->setFocus(Qt::PopupFocusReason);
 }
 
-measurements::measurement MeasurementModal::measurement() const
+measurements::measurement MeasurementDialog::measurement() const
 {
     return measurements::measurement{
         .id = m_id,
@@ -95,9 +95,9 @@ measurements::measurement MeasurementModal::measurement() const
     };
 }
 
-MeasurementModal::AcceptMode MeasurementModal::acceptMode() const { return m_acceptMode; }
+MeasurementDialog::AcceptMode MeasurementDialog::acceptMode() const { return m_acceptMode; }
 
-bool MeasurementModal::validate()
+bool MeasurementDialog::validate()
 {
     // we do not validate map as it can be automatically calculated. Maybe I'll add a button for that.
     const auto valid = m_ui->systolicEdit->hasAcceptableInput()
@@ -110,7 +110,7 @@ bool MeasurementModal::validate()
     return valid;
 }
 
-void MeasurementModal::accept()
+void MeasurementDialog::accept()
 {
     if (validate()) {
         QDialog::accept();

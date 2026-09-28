@@ -41,6 +41,14 @@ pub struct AsyncControllerHandle {
     tasks: TaskTracker,
 }
 
+impl AsyncControllerHandle {
+    /// Send a cancellation event to every task spawned from this handle.
+    /// The task tracker is not closed, as it is shared with other handles.
+    pub fn cancel(&self) {
+        self.shutdown_token.cancel();
+    }
+}
+
 pub fn create_async_controller() -> Box<AsyncController> {
     Box::new(AsyncController {
         runtime: Runtime::new().expect("Failed to start tokio runtime"),
@@ -101,19 +109,33 @@ impl Future for CancellableJoinHandle {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum SpawnError {
+    #[error("canceled")]
+    Canceled,
+}
+
 impl AsyncControllerHandle {
+    /// Spawn a callback to be executed on the runtime, if the cancellation
+    /// token has not been triggerd. The callback accepts a child token of the
+    /// one present in this handle. If already canceled at the current moment,
+    /// [Err](Err)([SpawnError](SpawnError)::[Canceled](SpawnError::Canceled))
+    /// is returned.
     pub fn spawn_cb<
         Fut: Future<Output = ()> + Send + 'static,
         Task: FnOnce(CancellationToken) -> Fut + Send + 'static,
     >(
         &self,
         task: Task,
-    ) -> CancellableJoinHandle {
+    ) -> Result<CancellableJoinHandle, SpawnError> {
         let token = self.shutdown_token.child_token();
+        if token.is_cancelled() {
+            return Err(SpawnError::Canceled);
+        }
         let task_token = token.clone();
         let handle = self
             .tasks
             .spawn_on(async move { task(task_token).await }, &self.runtime);
-        CancellableJoinHandle { token, handle }
+        Ok(CancellableJoinHandle { token, handle })
     }
 }
