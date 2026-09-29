@@ -38,6 +38,8 @@ to enter, for instance, only the diastolic pressure for a given data point.
 - Double-clicking anywhere else on the graph opens the modal to enter
   values for a new measurement. The date is pre-filled to the position of
   the cursor.
+- If not entered, the mean arterial pressure (MAP) defaults
+  to $\text{map} = 1/3 * \text{sys} + 2/3 * \text{dia}$.
 - Scrolling the mouse wheel while the cursor is over the graph adjusts the
   date range.
 - Dragging the cursor over the graph slides the date range in that
