@@ -21,7 +21,7 @@ int main(int argc, char *argv[])
     QCoreApplication::setOrganizationDomain(config::ORGANIZATION_DOMAIN);
     QCoreApplication::setApplicationName(config::APPLICATION_NAME);
 
-    if (!QSettings{}.value(config::SETTING_DATABASE_CONNECTION).isValid()) {
+    if (!QSettings{}.value(config::SETTING_DATABASE_CONNECTION).toUrl().isValid()) {
         QSettings{}.setValue(
             config::SETTING_DATABASE_CONNECTION,
             QUrl::fromLocalFile(
@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
     );
 
     MainWindow window{};
-    window.setModel(model.get());
+    window.setModel(model.get(), [&controller] { return controller->handle(); });
     window.show();
 
     QApplication::connect(&app, &QCoreApplication::aboutToQuit, [&controller] {

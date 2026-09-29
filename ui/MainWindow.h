@@ -27,7 +27,9 @@ public:
 
     ~MainWindow() override;
 
-    void setModel(measurements::MeasurementModel *model);
+    void setModel(
+        measurements::MeasurementModel *model, std::function<rust::Box<backend::AsyncControllerHandle>()> get_handle
+    );
 
 private slots:
     void newProject() const;
@@ -44,7 +46,7 @@ private:
     measurements::MeasurementModel *m_model{nullptr};
     MeasurementDialog *m_measurementDialog;
     PreferencesDialog *m_preferencesDialog;
-    std::array<QMetaObject::Connection, 1> m_modelConnections{};
+    std::array<QMetaObject::Connection, 3> m_modelConnections{};
     std::unique_ptr<Ui::MainWindow> m_ui;
 };
 

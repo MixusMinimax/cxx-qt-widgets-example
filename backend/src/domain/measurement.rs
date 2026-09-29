@@ -103,7 +103,7 @@ impl MeasurementService {
                 conn.batch_execute("PRAGMA journal_mode = WAL;")?;
                 // fsync only in critical moments
                 conn.batch_execute("PRAGMA synchronous = NORMAL;")?;
-                // write WAL changes back every 1000 pages, for an in average
+                // write WAL changes back every 1000 pages, for an on average
                 // 1MB WAL file. May affect readers if number is
                 // increased
                 conn.batch_execute("PRAGMA wal_autocheckpoint = 1000;")?;

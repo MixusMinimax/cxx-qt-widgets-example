@@ -50,28 +50,13 @@ MainWindow::MainWindow(QWidget *parent)
         m_measurementDialog->raise();
         m_measurementDialog->activateWindow();
     });
-
-    connect(m_measurementDialog, &MeasurementDialog::accepted, [this] {
-        if (!m_model) return;
-        switch (m_measurementDialog->acceptMode()) {
-            case MeasurementDialog::AcceptCreate:
-                m_model->create_measurement(m_measurementDialog->measurement());
-                break;
-            case MeasurementDialog::AcceptUpdate:
-                m_model->update_measurement(m_measurementDialog->measurement());
-                break;
-            case MeasurementDialog::AcceptDelete:
-                m_model->delete_measurement(m_measurementDialog->measurement().id);
-                break;
-        }
-    });
-
-    connect(m_preferencesDialog, &PreferencesDialog::accepted, [] { qDebug() << "preferences accepted"; });
 }
 
 MainWindow::~MainWindow() = default;
 
-void MainWindow::setModel(measurements::MeasurementModel *model)
+void MainWindow::setModel(
+    measurements::MeasurementModel *model, std::function<rust::Box<backend::AsyncControllerHandle>()> get_handle
+)
 {
     if (m_model == model) return;
     if (m_model) {
@@ -82,11 +67,32 @@ void MainWindow::setModel(measurements::MeasurementModel *model)
     if (m_model) {
         m_modelConnections = {
             connect(
-                m_model, &measurements::MeasurementModel::failure, [this](const uint32_t req_id, const QString &msg) {
+                m_model, &measurements::MeasurementModel::failure,
+                [this](const uint32_t req_id, const QString &msg) {
                     qDebug() << QString{"%1: %2"}.arg(req_id).arg(msg);
                     statusBar()->showMessage(QString{"%1: %2"}.arg(req_id).arg(msg));
                 }
             ),
+            connect(
+                m_measurementDialog, &MeasurementDialog::accepted,
+                [this] {
+                    switch (m_measurementDialog->acceptMode()) {
+                        case MeasurementDialog::AcceptCreate:
+                            m_model->create_measurement(m_measurementDialog->measurement());
+                            break;
+                        case MeasurementDialog::AcceptUpdate:
+                            m_model->update_measurement(m_measurementDialog->measurement());
+                            break;
+                        case MeasurementDialog::AcceptDelete:
+                            m_model->delete_measurement(m_measurementDialog->measurement().id);
+                            break;
+                    }
+                }
+            ),
+            connect(m_preferencesDialog, &PreferencesDialog::databaseUrlSaved, [this, get_handle](QUrl url) {
+                m_model->initialize(get_handle(), url.toString().toStdString());
+                m_model->load_measurements();
+            }),
         };
     } else {
         m_modelConnections = {};

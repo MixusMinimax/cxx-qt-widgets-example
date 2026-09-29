@@ -9,8 +9,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>576</width>
-    <height>233</height>
+    <width>770</width>
+    <height>205</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -27,6 +27,12 @@
     <layout class="QFormLayout" name="formLayout">
      <item row="0" column="0">
       <widget class="QLabel" name="databaseConnectionLabel">
+       <property name="minimumSize">
+        <size>
+         <width>150</width>
+         <height>0</height>
+        </size>
+       </property>
        <property name="text">
         <string>&amp;Database Connection:</string>
        </property>
@@ -38,15 +44,35 @@
      <item row="0" column="1">
       <layout class="QHBoxLayout" name="databaseConnectionPair">
        <item>
-        <widget class="QLineEdit" name="databaseConnectionEdit"/>
+        <widget class="QLineEdit" name="databaseConnectionEdit">
+         <property name="clearButtonEnabled">
+          <bool>true</bool>
+         </property>
+        </widget>
        </item>
        <item>
         <widget class="QToolButton" name="databaseConnectionPicker">
+         <property name="toolTip">
+          <string>Choose file</string>
+         </property>
          <property name="text">
           <string>...</string>
          </property>
          <property name="icon">
           <iconset theme="QIcon::ThemeIcon::DocumentOpen"/>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="databaseConnectionDefault">
+         <property name="toolTip">
+          <string>Reset to default</string>
+         </property>
+         <property name="text">
+          <string>...</string>
+         </property>
+         <property name="icon">
+          <iconset theme="QIcon::ThemeIcon::EditUndo"/>
          </property>
         </widget>
        </item>
