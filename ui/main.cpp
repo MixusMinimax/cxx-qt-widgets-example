@@ -21,7 +21,8 @@ int main(int argc, char *argv[])
     QCoreApplication::setOrganizationDomain(config::ORGANIZATION_DOMAIN);
     QCoreApplication::setApplicationName(config::APPLICATION_NAME);
 
-    if (!QSettings{}.value(config::SETTING_DATABASE_CONNECTION).toUrl().isValid()) {
+    if (const auto url = QSettings{}.value(config::SETTING_DATABASE_CONNECTION).toUrl();
+        !url.isValid() || !url.path().endsWith(".db")) {
         QSettings{}.setValue(
             config::SETTING_DATABASE_CONNECTION,
             QUrl::fromLocalFile(
