@@ -1,6 +1,11 @@
-|                                                                                                                                    |                                              |
-|------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------|
-| ![Screenshot of a blood pressure graph, with the mouse cursor hovering over a data point](./assets/Screenshot_20260929_143146.png) | ![](./assets/Screenshot_20260929_143355.png) |
+<table><tr>
+  <td>
+    <img alt="Screenshot of a blood pressure graph, with the mouse cursor hovering over a data point" src="assets/Screenshot_20260929_143146.png"/>
+  </td>
+  <td>
+    <img alt="Screenshot of a modal with input fields for editing a measurement" src="assets/Screenshot_20260929_143355.png"/>
+  </td>
+</tr></table>
 
 This is a small demo utilizing the following technologies:
 
