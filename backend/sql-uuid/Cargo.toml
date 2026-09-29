@@ -2,6 +2,7 @@
 name = "sql-uuid"
 version = "0.1.0"
 edition = "2024"
+license = "MIT OR Apache-2.0"
 
 [dependencies]
 diesel = { version = "2,<2.3.8", features = ["uuid"] }

@@ -1,5 +1,7 @@
-As explained in ../NOTICE, this directory is NOT subject to the GPLv3 license.
+Copyright (C) 2026  Maxi Barmetler <maxi@barmetler.com>
+
+This directory is NOT subject to the GPLv3 license.
 This directory is shipped in conjunction with the rest of the project for
 convenience, but is to be seen as a separate object.
 
-It is subject to ./LICENSE.
+Contents of this directory are subject to the MIT or Apache-2.0 license, at your choice.
