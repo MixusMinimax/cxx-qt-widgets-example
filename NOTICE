@@ -1,3 +1,5 @@
+Copyright (C) 2026  Maxi Barmetler <maxi@barmetler.com>
+
 DEFINITIONS
 
 source files: files that contain machine-readable instructions, like source
@@ -8,5 +10,5 @@ NOTICE
 
 Each license in this repository applies to all source files recursively found
 within the directory the license (or a symlink to it) resides within, UNTIL
-instructed otherwise. Licenses in subdirectories supersede any licenses
-from parent directories.
+instructed otherwise. Licenses and instructions found in subdirectories
+supersede any licenses from parent directories.
