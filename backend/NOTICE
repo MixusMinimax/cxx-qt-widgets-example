@@ -1,0 +1,5 @@
+As explained in ../NOTICE, this directory is NOT subject to the GPLv3 license.
+This directory is shipped in conjunction with the rest of the project for
+convenience, but is to be seen as a separate object.
+
+It is subject to ./LICENSE.

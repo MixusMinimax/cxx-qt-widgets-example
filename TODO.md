@@ -7,6 +7,7 @@
 - [ ] date range presets (today, this week, etc.)
   - [ ] default date range
 - [X] show errors sent back from backend in statusbar
+- [ ] shift-scroll for horizontal movement maybe?
 
 ### control
 
