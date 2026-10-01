@@ -84,11 +84,20 @@ public:
 
     [[nodiscard]] measurements::MeasurementModel *model() const { return m_model; }
 
+    enum ZoomScope
+    {
+        FIT_ALL,
+        FIT_TODAY,
+        FIT_CURRENT_WEEK,
+    };
+
+public slots:
     /*!
      * Whether the mean arterial pressure (map) is selectable in the graph. If false, the cursor will not snap to it.
      */
     void setMapSelectable(const bool value) { m_mapSelectable = value; }
 
+public:
     [[nodiscard]] bool mapSelectable() const { return m_mapSelectable; }
 
 signals:
@@ -98,6 +107,12 @@ signals:
 
 protected slots:
     void updateMeasurements(::rust::Slice<const measurements::measurement> measurements);
+
+public slots:
+    void zoom(ZoomScope z);
+
+    void writeSettings() const;
+    void readSettings() const;
 
 protected:
     void leaveEvent(QEvent *event) override;

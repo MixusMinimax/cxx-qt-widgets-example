@@ -181,7 +181,7 @@ struct BloodPressureGraph::InternalState
 };
 
 BloodPressureGraph::BloodPressureGraph(QWidget *parent)
-    : QCustomPlot{parent}, m_model{nullptr}, m_state{std::make_unique<InternalState>()}
+    : QCustomPlot{parent}, m_state{std::make_unique<InternalState>()}
 {
     m_gSystolic = addGraph(xAxis, yAxis);
     m_gDiastolic = addGraph(xAxis, yAxis);
@@ -536,6 +536,8 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
         }
     });
 
+    readSettings();
+
     replot();
 }
 
@@ -586,4 +588,59 @@ void BloodPressureGraph::updateMeasurements(const ::rust::Slice<const measuremen
     replot(rpQueuedReplot);
 }
 
+void BloodPressureGraph::zoom(const ZoomScope z)
+{
+    if (!m_model) return;
+
+    QDate date;
+    QDateTime first, last;
+    const auto m = m_model->measurements();
+
+    switch (z) {
+        case FIT_ALL:
+            if (m.empty()) return;
+            first = QCPAxisTickerDateTime::keyToDateTime(m.front().key).date().startOfDay();
+            last = QCPAxisTickerDateTime::keyToDateTime(m.back().key).date().addDays(1).startOfDay();
+            break;
+        case FIT_TODAY:
+            date = QDate::currentDate();
+            first = date.startOfDay();
+            last = date.addDays(1).startOfDay();
+            break;
+        case FIT_CURRENT_WEEK:
+            date = QDate::currentDate();
+            date = date.addDays(-date.dayOfWeek());
+            first = date.startOfDay();
+            last = date.addDays(7).startOfDay();
+            break;
+    }
+
+    xAxis->setRange(QCPAxisTickerDateTime::dateTimeToKey(first), QCPAxisTickerDateTime::dateTimeToKey(last));
+    replot();
+}
+
 void BloodPressureGraph::leaveEvent(QEvent *event) { emit mouseLeave(event); }
+
+
+void BloodPressureGraph::writeSettings() const
+{
+    QSettings settings{};
+    const auto range = xAxis->range();
+
+    settings.beginGroup("BloodPressureGraph");
+    settings.setValue("start", range.lower);
+    settings.setValue("end", range.upper);
+    settings.endGroup();
+}
+
+void BloodPressureGraph::readSettings() const
+{
+    QSettings settings{};
+    bool start_ok, end_ok;
+
+    settings.beginGroup("BloodPressureGraph");
+    const QCPRange range{settings.value("start").toDouble(&start_ok), settings.value("end").toDouble(&end_ok)};
+    settings.endGroup();
+
+    if (start_ok && end_ok) xAxis->setRange(range);
+}

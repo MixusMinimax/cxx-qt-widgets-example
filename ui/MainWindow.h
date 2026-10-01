@@ -47,24 +47,28 @@ public:
     ~MainWindow() override;
 
     void setModel(
-        measurements::MeasurementModel *model, std::function<rust::Box<backend::AsyncControllerHandle>()> get_handle
+        measurements::MeasurementModel *model,
+        const std::function<rust::Box<backend::AsyncControllerHandle>()> &get_handle
     );
 
-private slots:
-    void newProject() const;
-    void open();
-    void save();
-    void save_as();
-    void quit();
-    void about() const;
+protected slots:
+    void import_csv();
+    void export_csv();
 
 public slots:
+    void writeSettings() const;
+    void readSettings();
     void openPreferences() const;
+    void openAbout() const;
+    void quit();
+
+protected:
+    void closeEvent(QCloseEvent *event) override;
 
 private:
     measurements::MeasurementModel *m_model{nullptr};
     MeasurementDialog *m_measurementDialog;
     PreferencesDialog *m_preferencesDialog;
-    std::array<QMetaObject::Connection, 3> m_modelConnections{};
+    std::array<QMetaObject::Connection, 4> m_modelConnections{};
     std::unique_ptr<Ui::MainWindow> m_ui;
 };

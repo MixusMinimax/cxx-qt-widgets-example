@@ -41,18 +41,30 @@ MainWindow::MainWindow(QWidget *parent)
     m_ui->graphOutput->setMapSelectable(false);
 
     m_ui->actionNew->setShortcuts(QKeySequence::New);
-    m_ui->actionOpen->setShortcuts(QKeySequence::Open);
-    m_ui->actionSave->setShortcuts(QKeySequence::Save);
-    m_ui->actionSaveAs->setShortcuts(QKeySequence::SaveAs);
     m_ui->actionQuit->setShortcuts(QKeySequence::Quit);
+    m_ui->actionRefresh->setShortcuts(QKeySequence::Refresh);
 
-    connect(m_ui->actionNew, &QAction::triggered, this, &MainWindow::newProject);
-    connect(m_ui->actionOpen, &QAction::triggered, this, &MainWindow::open);
-    connect(m_ui->actionSave, &QAction::triggered, this, &MainWindow::save);
-    connect(m_ui->actionSaveAs, &QAction::triggered, this, &MainWindow::save_as);
+    connect(m_ui->actionImport, &QAction::triggered, this, &MainWindow::import_csv);
+    connect(m_ui->actionExport, &QAction::triggered, this, &MainWindow::export_csv);
     connect(m_ui->actionQuit, &QAction::triggered, this, &MainWindow::quit);
     connect(m_ui->actionPreferences, &QAction::triggered, this, &MainWindow::openPreferences);
-    connect(m_ui->actionAbout, &QAction::triggered, this, &MainWindow::about);
+    connect(m_ui->actionAbout, &QAction::triggered, this, &MainWindow::openAbout);
+
+    connect(m_ui->actionViewAll, &QAction::triggered, [this] { m_ui->graphOutput->zoom(BloodPressureGraph::FIT_ALL); });
+    connect(m_ui->actionViewToday, &QAction::triggered, [this] {
+        m_ui->graphOutput->zoom(BloodPressureGraph::FIT_TODAY);
+    });
+    connect(m_ui->actionViewCurrentWeek, &QAction::triggered, [this] {
+        m_ui->graphOutput->zoom(BloodPressureGraph::FIT_CURRENT_WEEK);
+    });
+
+    connect(m_ui->actionNew, &QAction::triggered, [this] {
+        m_measurementDialog->initialize(QDateTime::currentDateTime());
+        m_measurementDialog->setModal(true);
+        m_measurementDialog->show();
+        m_measurementDialog->raise();
+        m_measurementDialog->activateWindow();
+    });
 
     connect(m_ui->graphOutput, &BloodPressureGraph::measurementEditStarted, [this](measurements::measurement m) {
         m_measurementDialog->initialize(m);
@@ -69,12 +81,14 @@ MainWindow::MainWindow(QWidget *parent)
         m_measurementDialog->raise();
         m_measurementDialog->activateWindow();
     });
+
+    readSettings();
 }
 
 MainWindow::~MainWindow() = default;
 
 void MainWindow::setModel(
-    measurements::MeasurementModel *model, std::function<rust::Box<backend::AsyncControllerHandle>()> get_handle
+    measurements::MeasurementModel *model, const std::function<rust::Box<backend::AsyncControllerHandle>()> &get_handle
 )
 {
     if (m_model == model) return;
@@ -108,10 +122,16 @@ void MainWindow::setModel(
                     }
                 }
             ),
-            connect(m_preferencesDialog, &PreferencesDialog::databaseUrlSaved, [this, get_handle](QUrl url) {
-                m_model->initialize(get_handle(), url.toString().toStdString());
-                m_model->load_measurements();
-            }),
+            connect(
+                m_preferencesDialog, &PreferencesDialog::databaseUrlSaved,
+                [this, get_handle](const QUrl &url) {
+                    m_model->initialize(get_handle(), url.toString().toStdString());
+                    m_model->load_measurements();
+                }
+            ),
+            connect(
+                m_ui->actionRefresh, &QAction::triggered, m_model, &measurements::MeasurementModel::load_measurements
+            )
         };
     } else {
         m_modelConnections = {};
@@ -119,13 +139,7 @@ void MainWindow::setModel(
     m_ui->graphOutput->setModel(model);
 }
 
-void MainWindow::newProject() const
-{
-    qDebug() << "MainWindow::newProject()";
-    statusBar()->showMessage(tr("newProject"));
-}
-
-void MainWindow::open()
+void MainWindow::import_csv()
 {
     constexpr static auto KEY = "transfer/import/dir";
 
@@ -150,14 +164,7 @@ void MainWindow::open()
     m_model->import_measurements(url.toString().toStdString());
 }
 
-void MainWindow::save()
-{
-    qDebug() << "MainWindow::save()";
-    statusBar()->showMessage(tr("save"));
-    save_as(); // for now, later we will probably bind this to C-e (export)
-}
-
-void MainWindow::save_as()
+void MainWindow::export_csv()
 {
     constexpr static auto KEY = "transfer/export/dir";
 
@@ -184,6 +191,40 @@ void MainWindow::save_as()
     m_model->export_measurements(url.toString().toStdString());
 }
 
+void MainWindow::writeSettings() const
+{
+    QSettings settings{};
+
+    settings.beginGroup("MainWindow");
+    settings.setValue("geometry", saveGeometry());
+    settings.endGroup();
+
+    m_ui->graphOutput->writeSettings();
+}
+
+void MainWindow::readSettings()
+{
+    QSettings settings{};
+
+    settings.beginGroup("MainWindow");
+    const auto geometry = settings.value("geometry", QByteArray()).toByteArray();
+    if (!geometry.isEmpty()) restoreGeometry(geometry);
+    settings.endGroup();
+}
+
+void MainWindow::openPreferences() const
+{
+    m_preferencesDialog->setModal(true);
+    m_preferencesDialog->reset();
+    m_preferencesDialog->show();
+}
+
+void MainWindow::openAbout() const
+{
+    qDebug() << "MainWindow::about()";
+    statusBar()->showMessage(tr("about"));
+}
+
 void MainWindow::quit()
 {
     qDebug() << "MainWindow::quit()";
@@ -191,14 +232,9 @@ void MainWindow::quit()
     close();
 }
 
-void MainWindow::about() const
+void MainWindow::closeEvent(QCloseEvent *event)
 {
-    qDebug() << "MainWindow::about()";
-    statusBar()->showMessage(tr("about"));
-}
-void MainWindow::openPreferences() const
-{
-    m_preferencesDialog->setModal(true);
-    m_preferencesDialog->reset();
-    m_preferencesDialog->show();
+    qDebug() << "MainWindow::closeEvent";
+    writeSettings();
+    event->accept();
 }
