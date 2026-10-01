@@ -1,9 +1,9 @@
 <table><tr>
   <td>
-    <img alt="Screenshot of a blood pressure graph, with the mouse cursor hovering over a data point" src="assets/Screenshot_20260929_143146.png"/>
+    <img alt="Screenshot of a blood pressure graph, with the mouse cursor hovering over a data point" src="https://github.com/user-attachments/assets/8c713f79-3be8-486a-aaff-039e7099d829"/>
   </td>
   <td>
-    <img alt="Screenshot of a modal with input fields for editing a measurement" src="assets/Screenshot_20260929_143355.png"/>
+    <img alt="Screenshot of a modal with input fields for editing a measurement" src="https://github.com/user-attachments/assets/f7d7ce7f-94b3-4871-9245-6e537c4c1aa0"/>
   </td>
 </tr></table>
 
