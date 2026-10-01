@@ -49,13 +49,18 @@ to enter, for instance, only the diastolic pressure for a given data point.
   date range.
 - Dragging the cursor over the graph slides the date range in that
   direction.
+- Pressing one of the three zoom presets adjusts the date range to either
+  1. encompass the entire set of measurements
+  2. the current date
+  3. the current week
+- The viewed date range is remembered between program starts.
 
 #### Data
 
 - Edits are automatically synchronized into a `*.db` file using SQLite. The
   path for that file can be edited in `Edit/Preferences`.
-- Data can be exported in `File/Save` into a csv file.[^1]
-- Data can be imported in `File/Open` from a csv file.[^2]
+- Data can be exported in `File/Export` (C-e) into a csv file.[^1]
+- Data can be imported in `File/Import` (C-i) from a csv file.[^2]
 - Measurements are unique by timestamp.
 - On import, measurements that collide with existing measurements will
   replace[^3] existing measurements. Other existing measurements are
@@ -66,14 +71,13 @@ to enter, for instance, only the diastolic pressure for a given data point.
 For more features to come, read [TODO.md](./TODO.md).
 
 [^1]: There are currently no options for export, like delimiter or headers
-in the UI, but it is implemented in code. The action will be moved to
-`File/Export` (C-e) later.
+in the UI, but it is implemented in code.
 
 [^2]: There are currently no options for import, like delimiter or headers
-in the UI, but it is implemented in code. The action will be moved to
-`File/Import` (C-i) later. CSV headers must be present and correct, but the
-case is irrelevant. In the future, after selecting the file, it will be
-possible to select (and even auto-detect) the delimiter and header fields.
+in the UI, but it is implemented in code. CSV headers must be present and
+correct, but the case is irrelevant. In the future, after selecting the
+file, it will be possible to select (and even auto-detect) the delimiter
+and header fields.
 
 [^3]: In code, there already exist two strategies: Keep existing
 measurements, or replace them with the imported ones. Aforementioned Modal
