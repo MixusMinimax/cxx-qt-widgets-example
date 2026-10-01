@@ -14,7 +14,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>PreferencesDialog</string>
+   <string>Preferences</string>
   </property>
   <property name="sizeGripEnabled">
    <bool>false</bool>

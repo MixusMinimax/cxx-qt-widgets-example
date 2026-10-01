@@ -77,6 +77,7 @@ void MeasurementDialog::initialize(const initialize_opts &opts)
                 initialize(m_ui->mapEdit, measurement.map);
                 initialize(m_ui->pulseEdit, measurement.pulse);
                 m_ui->dateTimeEdit->setDateTime(roundToMinute(QCPAxisTickerDateTime::keyToDateTime(measurement.key)));
+                setWindowTitle(tr("Edit Measurement"));
             },
             [&, this](const QDateTime &date_time) {
                 m_acceptMode = AcceptCreate;
@@ -88,6 +89,7 @@ void MeasurementDialog::initialize(const initialize_opts &opts)
                 m_ui->mapEdit->clear();
                 m_ui->pulseEdit->clear();
                 m_ui->dateTimeEdit->setDateTime(roundToMinute(date_time));
+                setWindowTitle(tr("Create Measurement"));
             }
         },
         opts

@@ -101,6 +101,7 @@ public:
     [[nodiscard]] bool mapSelectable() const { return m_mapSelectable; }
 
 signals:
+    void mouseEnter(QEnterEvent *event);
     void mouseLeave(QEvent *event);
     void measurementEditStarted(measurements::measurement m);
     void measurementCreateStarted(QDateTime date_time);
@@ -115,6 +116,7 @@ public slots:
     void readSettings() const;
 
 protected:
+    void enterEvent(QEnterEvent *event) override;
     void leaveEvent(QEvent *event) override;
 
     QCPGraph *m_gSystolic, *m_gDiastolic, *m_gMap, *m_gPulse;

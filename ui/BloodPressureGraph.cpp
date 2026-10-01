@@ -500,14 +500,24 @@ BloodPressureGraph::BloodPressureGraph(QWidget *parent)
         replot(rpQueuedReplot);
     });
 
-    connect(this, &BloodPressureGraph::mouseLeave, [this, selection_line, value_line, pressure_tag, pulse_tag] {
-        m_state->click_started = false;
-        selection_line->setVisible(false);
-        value_line->setVisible(false);
-        pressure_tag->setVisible(false);
-        pulse_tag->setVisible(false);
+    connect(this, &BloodPressureGraph::mouseEnter, [this, move_cursor](const QEnterEvent *e) {
+        const auto pos = e->position();
+        move_cursor(pos);
         replot(rpQueuedReplot);
     });
+
+    connect(
+        this, &BloodPressureGraph::mouseLeave,
+        [this, selection_line, value_line, pressure_tag, pulse_tag, measurement_preview] {
+            m_state->click_started = false;
+            selection_line->setVisible(false);
+            value_line->setVisible(false);
+            pressure_tag->setVisible(false);
+            pulse_tag->setVisible(false);
+            measurement_preview->setVisible(false);
+            replot(rpQueuedReplot);
+        }
+    );
 
     connect(this, &QCustomPlot::mouseRelease, [this, cursor_tracer] {
         static const std::chrono::milliseconds start_drag_time{QApplication::startDragTime()};
@@ -619,8 +629,9 @@ void BloodPressureGraph::zoom(const ZoomScope z)
     replot();
 }
 
-void BloodPressureGraph::leaveEvent(QEvent *event) { emit mouseLeave(event); }
+void BloodPressureGraph::enterEvent(QEnterEvent *event) { emit mouseEnter(event); }
 
+void BloodPressureGraph::leaveEvent(QEvent *event) { emit mouseLeave(event); }
 
 void BloodPressureGraph::writeSettings() const
 {
