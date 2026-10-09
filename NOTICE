@@ -3,8 +3,7 @@ Copyright (C) 2026  Maxi Barmetler <maxi@barmetler.com>
 DEFINITIONS
 
 source files: files that contain machine-readable instructions, like source
-              code, makefiles, cmake scripts, but NOT configuration files
-              like json, toml, yml, or csv files.
+              code, makefiles, cmake scripts, or QT ui definitions.
 
 NOTICE
 
