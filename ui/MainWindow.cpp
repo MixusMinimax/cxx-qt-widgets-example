@@ -198,7 +198,10 @@ void MainWindow::writeSettings() const
     QSettings settings{};
 
     settings.beginGroup("MainWindow");
-    settings.setValue("geometry", saveGeometry());
+    if (!isMaximized()) {
+        settings.setValue("geometry", saveGeometry());
+    }
+    settings.setValue("maximized", isMaximized());
     settings.endGroup();
 
     m_ui->graphOutput->writeSettings();
@@ -211,6 +214,8 @@ void MainWindow::readSettings()
     settings.beginGroup("MainWindow");
     const auto geometry = settings.value("geometry", QByteArray()).toByteArray();
     if (!geometry.isEmpty()) restoreGeometry(geometry);
+    if (settings.value("maximized").toBool()) showMaximized();
+
     settings.endGroup();
 }
 
