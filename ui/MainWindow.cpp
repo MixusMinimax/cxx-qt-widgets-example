@@ -50,6 +50,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_ui->actionQuit, &QAction::triggered, this, &MainWindow::quit);
     connect(m_ui->actionPreferences, &QAction::triggered, this, &MainWindow::openPreferences);
     connect(m_ui->actionAbout, &QAction::triggered, this, &MainWindow::openAbout);
+    connect(m_ui->actionAboutQt, &QAction::triggered, qApp, &QApplication::aboutQt);
 
     connect(m_ui->actionViewAll, &QAction::triggered, [this] { m_ui->graphOutput->zoom(BloodPressureGraph::FIT_ALL); });
     connect(m_ui->actionViewToday, &QAction::triggered, [this] {
