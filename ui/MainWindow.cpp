@@ -30,6 +30,7 @@
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow{parent},
+      m_aboutDialog{new AboutDialog{this}},
       m_measurementDialog{new MeasurementDialog{this}},
       m_preferencesDialog{new PreferencesDialog{this}},
       m_ui{std::make_unique<Ui::MainWindow>()}
@@ -219,11 +220,7 @@ void MainWindow::openPreferences() const
     m_preferencesDialog->show();
 }
 
-void MainWindow::openAbout() const
-{
-    qDebug() << "MainWindow::about()";
-    statusBar()->showMessage(tr("about"));
-}
+void MainWindow::openAbout() const { m_aboutDialog->show(); }
 
 void MainWindow::quit()
 {

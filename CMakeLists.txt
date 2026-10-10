@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.14)
 
-project(MyApp LANGUAGES CXX)
+project(MyApp LANGUAGES CXX VERSION 0.1.0)
 
 option(AUTOLINK_COMPILE_COMMANDS "\
 symlink the compile_commands.json file from the build folder into the root folder. \
@@ -35,6 +35,7 @@ endif ()
 find_package(SQLite3)
 
 qt_standard_project_setup()
+set(CMAKE_AUTORCC ON)
 
 add_subdirectory(vendor/qcustomplot)
 
@@ -47,6 +48,8 @@ cxx_qt_import_crate(
 target_link_libraries(backend INTERFACE SQLite3::SQLite3)
 
 qt_add_executable(bpdiary
+        ui/application.qrc
+
         ui/main.cpp
         ui/MainWindow.cpp
         ui/MainWindow.h
@@ -59,11 +62,14 @@ qt_add_executable(bpdiary
         ui/PreferencesDialog.cpp
         ui/PreferencesDialog.h
         ui/PreferencesDialog.ui
+        ui/AboutDialog.cpp
+        ui/AboutDialog.h
+        ui/AboutDialog.ui
 
         ui/MyModel.cpp
 )
 
-target_include_directories(bpdiary PUBLIC ui)
+target_include_directories(bpdiary PRIVATE ui)
 
 target_link_libraries(bpdiary
         PRIVATE
@@ -73,6 +79,9 @@ target_link_libraries(bpdiary
         backend
         qcustomplot
 )
+
+configure_file(ui/versions.h.in version.h @ONLY)
+target_include_directories(bpdiary PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 
 if (AUTOLINK_COMPILE_COMMANDS)
     execute_process(

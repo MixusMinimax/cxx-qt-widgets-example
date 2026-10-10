@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include "AboutDialog.h"
 #include "MeasurementDialog.h"
 #include "PreferencesDialog.h"
 
@@ -67,6 +68,7 @@ protected:
 
 private:
     measurements::MeasurementModel *m_model{nullptr};
+    AboutDialog *m_aboutDialog;
     MeasurementDialog *m_measurementDialog;
     PreferencesDialog *m_preferencesDialog;
     std::array<QMetaObject::Connection, 4> m_modelConnections{};
