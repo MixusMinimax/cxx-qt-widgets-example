@@ -46,7 +46,7 @@ cxx_qt_import_crate(
 
 target_link_libraries(backend INTERFACE SQLite3::SQLite3)
 
-qt_add_executable(myapp
+qt_add_executable(bpdiary
         ui/main.cpp
         ui/MainWindow.cpp
         ui/MainWindow.h
@@ -63,9 +63,9 @@ qt_add_executable(myapp
         ui/MyModel.cpp
 )
 
-target_include_directories(myapp PUBLIC ui)
+target_include_directories(bpdiary PUBLIC ui)
 
-target_link_libraries(myapp
+target_link_libraries(bpdiary
         PRIVATE
         Qt6::Core
         Qt6::Gui
@@ -81,3 +81,8 @@ if (AUTOLINK_COMPILE_COMMANDS)
             ${CMAKE_SOURCE_DIR}/compile_commands.json
     )
 endif ()
+
+install(TARGETS bpdiary
+        BUNDLE DESTINATION .
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
