@@ -621,7 +621,7 @@ void BloodPressureGraph::zoom(const ZoomScope z)
             date = QDate::currentDate();
             date = date.addDays(-date.dayOfWeek());
             first = date.startOfDay();
-            last = date.addDays(7).startOfDay();
+            last = date.addDays(8).startOfDay();
             break;
     }
 
